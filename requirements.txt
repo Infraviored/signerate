@@ -1,0 +1,4 @@
+flask>=3.0.0
+cadquery>=2.4.0
+trimesh>=4.0.0
+numpy
