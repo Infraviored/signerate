@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  signerate:
+    build: .
+    container_name: signerate
+    restart: unless-stopped
+    volumes:
+      - ./sets:/app/sets
+      - ./settings.json:/app/settings.json
+    environment:
+      - TZ=Europe/Berlin
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 256M
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
+    name: proxy-network
