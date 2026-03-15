@@ -3,7 +3,8 @@ import os
 import glob
 import re
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Callable
+from PIL import ImageFont
 
 import cadquery as cq
 from cadquery import Color, Location, Vector
@@ -158,26 +159,29 @@ def calculate_optimal_font_size(
     limiting_text = ""
     is_width_limited = False
 
+    # Use Pillow for extremely fast metrics
+    try:
+        # We use a large ref_size in pixels to get good precision
+        pilot_size = 100
+        font = ImageFont.truetype(font_path, size=pilot_size)
+    except Exception as e:
+        print(f"DEBUG: Pillow font load failed: {e}")
+        # Full fallback if Pillow fails (unlikely given it's installed)
+        return _calculate_legacy(texts, font_path, available_width, available_height, ref_size)
+
     for text in texts:
         text_strip = text.strip()
         if not text_strip:
             continue
 
-        sample = (
-            cq.Workplane("XY")
-            .text(
-                text_strip,
-                fontsize=ref_size,
-                distance=0.5,
-                fontPath=font_path,
-                halign="center",
-                valign="center",
-            )
-        )
+        # getbbox returns (left, top, right, bottom)
+        bbox = font.getbbox(text_strip)
+        raw_w = bbox[2] - bbox[0]
+        raw_h = bbox[3] - bbox[1]
 
-        bb = sample.val().BoundingBox()
-        text_w = bb.xmax - bb.xmin
-        text_h = bb.ymax - bb.ymin
+        # Convert back to 'ref_size' scale
+        text_w = raw_w * (ref_size / pilot_size)
+        text_h = raw_h * (ref_size / pilot_size)
         if text_w <= 0 or text_h <= 0: continue
 
         # Scale based on geometric bounding box
@@ -202,7 +206,26 @@ def calculate_optimal_font_size(
     if max_scale == float("inf"):
         return ref_size, ""
 
-    return ref_size * max_scale, limiting_text
+    return round(max_scale * ref_size, 3), limiting_text
+
+
+def _calculate_legacy(texts, font_path, available_width, available_height, ref_size):
+    """Fallback using CadQuery for metrics (SLOW)"""
+    max_scale = float("inf")
+    limiting_text = ""
+    for text in texts:
+        text_strip = text.strip()
+        if not text_strip: continue
+        sample = cq.Workplane("XY").text(text_strip, fontsize=ref_size, distance=0.1, fontPath=font_path)
+        bb = sample.val().BoundingBox()
+        text_w, text_h = bb.xmax - bb.xmin, bb.ymax - bb.ymin
+        sw = available_width / text_w
+        sh = available_height / text_h
+        scale = min(sw, sh)
+        if scale < max_scale:
+            max_scale = scale
+            limiting_text = text_strip
+    return round(max_scale * ref_size, 3), limiting_text
 
 
 def generate_preview_svg(
@@ -279,7 +302,8 @@ def generate_signs(
     texts: List[str],
     settings: dict,
     output_path: str,
-    export_type: str = "3mf"
+    export_type: str = "3mf",
+    progress_callback: Callable[[int, int], None] = None
 ) -> Tuple[float, str]:
     width = float(settings["width"])
     height = float(settings["height"])
@@ -328,6 +352,9 @@ def generate_signs(
     assy = cq.Assembly(name="Signs")
 
     for i, text in enumerate(clean_texts):
+        if progress_callback:
+            progress_callback(i, len(clean_texts))
+        
         safe = _safe_name(text)
         y_offset = i * (height + spacing)
         

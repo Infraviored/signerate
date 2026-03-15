@@ -17,6 +17,7 @@ LAST_GENERATED = {
     "path": "signs.3mf",
     "mimetype": "model/3mf"
 }
+PROGRESS = {"current": 0, "total": 0, "active": False}
 
 def log_info(msg):
     print(f"[INFO] {msg}")
@@ -159,7 +160,18 @@ def api_generate():
     mimetype = "model/3mf" if fmt == "3mf" else "application/step"
 
     try:
-        font_size, path = generate_signs(texts, settings, output_file, export_type=fmt)
+        def on_progress(curr, total):
+            PROGRESS["current"] = curr + 1
+            PROGRESS["total"] = total
+            PROGRESS["active"] = True
+
+        PROGRESS["current"] = 0
+        PROGRESS["total"] = len([t for t in texts if t.strip()])
+        PROGRESS["active"] = True
+
+        font_size, path = generate_signs(texts, settings, output_file, export_type=fmt, progress_callback=on_progress)
+        
+        PROGRESS["active"] = False
         LAST_GENERATED["path"] = path
         LAST_GENERATED["mimetype"] = mimetype
         
@@ -173,6 +185,10 @@ def api_generate():
         log_error(e)
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/api/progress")
+def api_progress():
+    return jsonify(PROGRESS)
 
 @app.route("/api/download")
 def api_download():

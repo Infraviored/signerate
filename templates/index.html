@@ -191,6 +191,11 @@
         </div>
         
         <div id="status-toast" class="status-toast" style="margin-top: 1rem;"></div>
+        
+        <div id="gen-progress-container" class="progress-container">
+          <div id="gen-progress-bar" class="progress-bar"></div>
+        </div>
+        <div id="gen-progress-text" class="progress-text">Generating...</div>
       </div>
 
     </div>
@@ -633,8 +638,28 @@
     }
 
     const btn = document.getElementById("gen-btn");
+    const progressContainer = document.getElementById("gen-progress-container");
+    const progressBar = document.getElementById("gen-progress-bar");
+    const progressText = document.getElementById("gen-progress-text");
+
     btn.classList.add("loading");
     btn.disabled = true;
+    progressContainer.style.display = "block";
+    progressText.style.display = "block";
+    progressBar.style.width = "0%";
+    progressText.textContent = `Starting generation...`;
+
+    let progressInterval = setInterval(async () => {
+        try {
+            const res = await fetch("/api/progress");
+            const data = await res.json();
+            if (data.active && data.total > 0) {
+                const pct = (data.current / data.total) * 100;
+                progressBar.style.width = `${pct}%`;
+                progressText.textContent = `Processing sign ${data.current} of ${data.total}...`;
+            }
+        } catch(e) {}
+    }, 500);
 
     try {
       const res = await fetch("/api/generate", {
@@ -645,6 +670,9 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
+      progressBar.style.width = "100%";
+      progressText.textContent = "Complete!";
+
       showToast("Generation successful! Downloading...", "success");
       lastGeneratedState = currentState;
       document.getElementById("gen-btn-text").textContent = "⬇️ Download Again";
@@ -652,9 +680,15 @@
       
     } catch (e) {
       showToast("Error: " + e.message, "error");
+      progressText.textContent = "Failed.";
     } finally {
+      clearInterval(progressInterval);
       btn.classList.remove("loading");
       btn.disabled = false;
+      setTimeout(() => {
+          progressContainer.style.display = "none";
+          progressText.style.display = "none";
+      }, 3000);
     }
   }
 
