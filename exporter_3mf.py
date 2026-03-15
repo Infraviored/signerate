@@ -116,17 +116,20 @@ def _build_3mf_xml(groups: list) -> str:
             lines.append("      </mesh>")
             lines.append("    </object>")
         
-        # 3. Define Compoment/Group Object
+        # 3. Define Component/Group Object
         group_id = next_id
         next_id += 1
         group_info.append(group_id)
-        
-        lines.append(f'    <object id="{group_id}" type="model" name="{_xml_attr(group["name"])}">')
-        lines.append("      <components>")
-        for p_id in part_ids:
-            lines.append(f'        <component objectid="{p_id}"/>')
-        lines.append("      </components>")
-        lines.append("    </object>")
+
+        lines.append(f'<object id="{group_id}" type="model" name="{_xml_attr(group["name"])}">')
+        lines.append("  <components>")
+        for p_id, part in zip(part_ids, group["parts"]):
+            lines.append(
+                f'    <component objectid="{p_id}" name="{_xml_attr(part["name"])}" />'
+            )
+        lines.append("  </components>")
+        lines.append("</object>")
+
 
     lines.append("  </resources>")
     lines.append("  <build>")

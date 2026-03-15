@@ -440,20 +440,26 @@ def generate_signs(
             text_verts, text_faces = _tessellate(
                 letters_shape, y_offset=y_offset, tolerance=tess_tol, ang_tol=tess_ang_tol
             )
-            
+                                    
             objects_3mf.append({
                 "name": sign_name,
                 "parts": [
                     {
                         "name": f"{sign_name}_Background",
-                        "verts": base_verts, "faces": base_faces, "color": bg_color_hex
+                        "verts": base_verts,
+                        "faces": base_faces,
+                        "color": bg_color_hex,
                     },
                     {
-                        "name": f"{sign_name}-text",
-                        "verts": text_verts, "faces": text_faces, "color": tx_color_hex
-                    }
-                ]
+                        "name": f"{sign_name}_Text",
+                        "verts": text_verts,
+                        "faces": text_faces,
+                        "color": tx_color_hex,
+                    },
+                ],
             })
+
+
         else:
             # Assembly for STEP (keep hierarchical)
             loc = Location(Vector(0, y_offset, 0))
