@@ -619,6 +619,7 @@
           showToast(`Loaded set: ${name}`, "success");
       } catch (e) {
           showToast("Failed to load set: " + e.message, "error");
+          throw e; // Re-throw so IIFE catch block can handle fallback
       }
   }
 

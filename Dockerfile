@@ -26,8 +26,8 @@ RUN mkdir -p sets
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=app.py
 
-EXPOSE 5000
+EXPOSE 15000
 
 # Use gunicorn with a single worker to keep memory usage low as requested
 # Timeout is high because geometry generation can take time
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "--timeout", "300", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:15000", "--workers", "1", "--threads", "4", "--timeout", "300", "app:app"]

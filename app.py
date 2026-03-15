@@ -210,10 +210,13 @@ SETS_DIR = Path("sets")
 
 def init_sets():
     """Seeds the Workshop Signs set if no sets exist."""
+    log_info(f"Checking for sets in {SETS_DIR.absolute()}")
     if not SETS_DIR.exists():
+        log_info(f"Creating sets directory: {SETS_DIR}")
         SETS_DIR.mkdir()
     
     existing = list(SETS_DIR.glob("*.json"))
+    log_info(f"Found existing sets: {existing}")
     if not existing:
         log_info("Seeding default 'Workshop' set...")
         default_set = {
@@ -233,6 +236,7 @@ def init_sets():
         }
         with open(SETS_DIR / "Workshop.json", "w", encoding="utf-8") as f:
             json.dump(default_set, f, indent=4, ensure_ascii=False)
+        log_info("Seeding complete.")
 
 @app.route("/api/sets", methods=["GET"])
 def api_list_sets():
@@ -266,6 +270,7 @@ def api_save_set():
     return jsonify({"ok": True, "name": safe_name})
 
 
+init_sets()
+
 if __name__ == "__main__":
-    init_sets()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=15000)
