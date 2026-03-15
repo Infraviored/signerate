@@ -47,6 +47,120 @@ body {
   }
 }
 
+/* --- Custom Dropdown --- */
+.custom-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown-trigger {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  transition: var(--transition);
+}
+
+.dropdown-trigger::after {
+  content: "";
+  width: 1.2rem;
+  height: 1.2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  transition: transform 0.3s;
+}
+
+.dropdown-trigger.active {
+  border-color: #ff9800;
+  background: rgba(255, 152, 0, 0.05);
+}
+
+.dropdown-trigger.active::after {
+  transform: rotate(180deg);
+}
+
+.dropdown-content {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: rgba(15, 15, 20, 0.95);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+  z-index: 1000;
+  display: none;
+  overflow: hidden;
+  animation: dropIn 0.2s ease-out;
+}
+
+.dropdown-content.show {
+  display: block;
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-search {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.dropdown-search input {
+  height: 38px !important;
+  background: rgba(0,0,0,0.5) !important;
+  font-size: 0.85rem !important;
+}
+
+.dropdown-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dropdown-list::-webkit-scrollbar {
+  width: 5px;
+}
+.dropdown-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.dropdown-option {
+  padding: 0.85rem 1.25rem;
+  cursor: pointer;
+  color: #fff;
+  font-size: 1.1rem;
+  transition: background 0.2s;
+  border-bottom: 1px solid rgba(255,255,255,0.02);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-option:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.dropdown-option.selected {
+  background: rgba(255, 152, 0, 0.1);
+  color: #ff9800;
+  font-weight: 700;
+}
+
 /* --- Typography --- */
 h1 {
   font-size: 2.5rem;
@@ -94,6 +208,36 @@ h2 svg {
   border-color: rgba(255, 255, 255, 0.15);
 }
 
+.white-card {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius);
+  padding: 2.5rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  color: var(--text);
+}
+
+.white-card h2 {
+  color: var(--text);
+}
+
+.white-card .entry-num {
+  color: var(--text-muted);
+}
+
+.white-card input[type="text"] {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.white-card input[type="text"]:focus {
+  border-color: var(--primary);
+  background: rgba(0, 0, 0, 0.6);
+}
+
 /* --- Forms --- */
 .field-group {
   margin-bottom: 1.5rem;
@@ -111,14 +255,32 @@ input[type="number"],
 input[type="text"],
 select {
   width: 100%;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   color: var(--text);
   padding: 0.75rem 1rem;
   font-size: 0.95rem;
   font-family: inherit;
   transition: var(--transition);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 44px; /* Ensure uniform height for table alignment */
+}
+
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1.2rem;
+  padding-right: 2.5rem;
+}
+
+select option {
+  background: #111;
+  color: #fff;
+  padding: 12px;
 }
 
 input:focus, select:focus {
@@ -152,23 +314,40 @@ input[type="color"] {
 }
 
 .entry-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.35rem 0;
+  transition: var(--transition);
+  border-radius: 8px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.entry-item.bottleneck {
+  border-radius: 8px; /* Added placeholder to fix empty ruleset lint */
+}
+
+.sign-mini-preview {
+  height: 44px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  animation: slideIn 0.3s ease-out;
+  justify-content: center;
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.bottleneck .sign-mini-preview,
+.bottleneck input[type="text"] {
+  border-color: #ff9800 !important;
 }
 
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-.entry-num {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  width: 1.5rem;
-  text-align: right;
 }
 
 /* --- Buttons --- */
@@ -226,10 +405,21 @@ input[type="color"] {
 }
 
 .btn-icon {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 8px;
+  font-size: 1.2rem;
+}
+
+.white-card .btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.white-card .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* --- Preview Area --- */

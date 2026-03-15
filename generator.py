@@ -21,7 +21,7 @@ DEFAULT_SETTINGS = {
     "text_thickness": 1.5,   # visible / flush text height and pocket depth
     "bg_color": "#ffffff",
     "text_color": "#000000",
-    "text_protrusion": 1.5,
+    "text_protrusion": 0.0,
     "font_path": "",
     "export_format": "3mf"
 }
@@ -84,7 +84,7 @@ def find_system_fonts() -> List[dict]:
                 seen_paths.add(norm)
                 fonts.append({
                     "name": Path(path).stem,
-                    "path": norm
+                    "path": norm.replace("\\", "/") # Use forward slashes for JS safety
                 })
 
     fonts.sort(key=lambda x: x["name"].lower())
@@ -135,18 +135,29 @@ def calculate_optimal_font_size(
     available_width: float,
     available_height: float,
     ref_size: float = 20.0,
-) -> float:
+) -> Tuple[float, str]:
+    """
+    Calculates font size and returns which text was the width-limiting factor.
+    Note: If the height is the limiting factor, it affects all signs equally,
+    so we only report a 'limiting_text' if it's limited by width (too long).
+    """
+    # 1. Global height limit (applied to everyone)
+    # We sample a generic tall character to find height scale if texts are empty? 
+    # No, we'll just check it during the loop.
+    
     max_scale = float("inf")
+    limiting_text = ""
+    is_width_limited = False
 
     for text in texts:
-        text = text.strip()
-        if not text:
+        text_strip = text.strip()
+        if not text_strip:
             continue
 
         sample = (
             cq.Workplane("XY")
             .text(
-                text,
+                text_strip,
                 fontsize=ref_size,
                 distance=0.5,
                 fontPath=font_path,
@@ -158,16 +169,29 @@ def calculate_optimal_font_size(
         bb = sample.val().BoundingBox()
         text_w = bb.xmax - bb.xmin
         text_h = bb.ymax - bb.ymin
+        if text_w <= 0 or text_h <= 0: continue
 
-        if text_w > 0:
-            max_scale = min(max_scale, available_width / text_w)
-        if text_h > 0:
-            max_scale = min(max_scale, available_height / text_h)
+        scale_w = available_width / text_w
+        scale_h = available_height / text_h
+        
+        # The actual scale for this sign is min(scale_w, scale_h)
+        local_scale = min(scale_w, scale_h)
+        
+        if local_scale < max_scale:
+            max_scale = local_scale
+            # We ONLY report a bottleneck if the width was what constrained THIS local sign
+            # AND this local sign is the new global minimum.
+            if scale_w < scale_h:
+                limiting_text = text_strip
+                is_width_limited = True
+            else:
+                limiting_text = ""
+                is_width_limited = False
 
     if max_scale == float("inf"):
-        return ref_size
+        return ref_size, ""
 
-    return ref_size * max_scale
+    return ref_size * max_scale, limiting_text
 
 
 def generate_preview_svg(
@@ -190,7 +214,7 @@ def generate_preview_svg(
 
     available_w = width - 2 * margin
     available_h = height - 2 * margin
-    font_size = calculate_optimal_font_size(clean_texts, font_path, available_w, available_h)
+    font_size, _ = calculate_optimal_font_size(clean_texts, font_path, available_w, available_h)
 
     spacing = 10.0
     total_height = len(clean_texts) * height + (len(clean_texts) - 1) * spacing
@@ -259,7 +283,7 @@ def generate_signs(
     if not clean_texts:
         raise ValueError("No text provided for generation.")
 
-    font_size = calculate_optimal_font_size(
+    font_size, _ = calculate_optimal_font_size(
         clean_texts, font_path, available_w, available_h
     )
 
@@ -271,8 +295,11 @@ def generate_signs(
     spacing = 10.0
     pocket_tol = 0.02
     top_opening_overshoot = 0.05
-    tess_tol = 0.05
-    tess_ang_tol = 0.5
+    tess_tol = 0.01
+    tess_ang_tol = 0.1
+
+    protrusion = float(settings.get("text_protrusion", 0.0))
+    print(f"DEBUG: Generating signs with base_h={base_h}, text_h={text_h}, protrusion={protrusion}")
 
     # Für 3MF-Export (Tessellierte Objekte)
     objects_3mf = []
@@ -282,36 +309,57 @@ def generate_signs(
     for i, text in enumerate(clean_texts):
         safe = _safe_name(text)
         y_offset = i * (height + spacing)
-        text_z_bottom = base_h - text_h
+        
+        # Text always ends at base_h + protrusion
+        # If protrusion is 0, top of text is flush with base_h.
+        text_z_top = base_h + protrusion
+        text_z_bottom = text_z_top - text_h
+        
+        print(f"  Sign '{text}': Z_bottom={text_z_bottom:.3f}, Z_top={text_z_top:.3f}")
 
-        # 1. Text erzeugen
+        # 1. Generate Letter Solid
         letters_raw = (
             cq.Workplane("XY")
             .workplane(offset=text_z_bottom)
             .text(text, fontsize=font_size, distance=text_h, fontPath=font_path,
                   halign="center", valign="center")
         )
-        letters_shape = _fuse_all_solids(letters_raw, tol=pocket_tol)
+        letters_shape = _fuse_all_solids(letters_raw, tol=pocket_tol).clean()
 
-        # 2. Tasche erzeugen
-        pocket_raw = (
-            cq.Workplane("XY")
-            .workplane(offset=text_z_bottom)
-            .text(text, fontsize=font_size, distance=text_h + top_opening_overshoot,
-                  fontPath=font_path, halign="center", valign="center")
-        )
-        pocket_shape = _fuse_all_solids(pocket_raw, tol=pocket_tol)
+        # 2. Generate Pocket
+        # Pocket depth is only the part that is below the top surface
+        pocket_depth = base_h - text_z_bottom
+        
+        if pocket_depth > 0.001:
+            pocket_raw = (
+                cq.Workplane("XY")
+                .workplane(offset=text_z_bottom)
+                .text(text, fontsize=font_size, distance=pocket_depth + top_opening_overshoot,
+                fontPath=font_path, halign="center", valign="center")
+            )
+            pocket_shape = _fuse_all_solids(pocket_raw, tol=pocket_tol).clean()
 
-        # 3. Basis erzeugen und Tasche schneiden
-        base_solid = cq.Workplane("XY").box(width, height, base_h, centered=(True, True, False)).val()
-        base_cut_shape = base_solid.cut(pocket_shape, tol=pocket_tol).clean()
+            # 3. Cut Background
+            base_solid = cq.Workplane("XY").box(width, height, base_h, centered=(True, True, False)).val()
+            base_cut_shape = base_solid.cut(pocket_shape, tol=pocket_tol).clean()
+        else:
+            # If text is floating entirely above (protrusion > text_h), no pocket needed
+            base_cut_shape = cq.Workplane("XY").box(width, height, base_h, centered=(True, True, False)).val()
 
         if export_type.lower() == "3mf":
             # Tessellieren für 3MF
-            base_verts, base_faces = _tessellate(base_cut_shape, y_offset=y_offset,
-                                               tolerance=tess_tol, ang_tol=tess_ang_tol)
-            text_verts, text_faces = _tessellate(letters_shape, y_offset=y_offset,
-                                               tolerance=tess_tol, ang_tol=tess_ang_tol)
+            base_verts, base_faces = _tessellate(
+                base_cut_shape,
+                y_offset=y_offset,
+                tolerance=tess_tol,
+                ang_tol=tess_ang_tol,
+            )
+            text_verts, text_faces = _tessellate(
+                letters_shape,
+                y_offset=y_offset,
+                tolerance=tess_tol,
+                ang_tol=tess_ang_tol,
+            )
             objects_3mf.append({
                 "name": f"Background_{safe}_{i}",
                 "verts": base_verts, "faces": base_faces, "color": bg_color_hex

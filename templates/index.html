@@ -40,11 +40,11 @@
       <div class="grid">
         <div class="field-group">
           <label>Base Thickness (mm)</label>
-          <input type="number" id="s-base-h" min="0.4" step="0.2" value="{{ settings.base_thickness }}">
+          <input type="number" id="s-base-h" min="0.4" step="0.2" value="{{ settings.base_thickness }}" onchange="updateAllPreviews()">
         </div>
         <div class="field-group">
           <label>Text Thickness (mm)</label>
-          <input type="number" id="s-text-h" min="0.2" step="0.2" value="{{ settings.text_thickness }}">
+          <input type="number" id="s-text-h" min="0.2" step="0.2" value="{{ settings.text_thickness }}" onchange="updateAllPreviews()">
         </div>
       </div>
 
@@ -55,7 +55,7 @@
         </div>
         <div class="field-group">
           <label>Protrusion (mm)</label>
-          <input type="number" id="s-protrusion" step="0.1" value="{{ settings.text_protrusion }}">
+          <input type="number" id="s-protrusion" step="0.1" value="{{ settings.text_protrusion }}" onchange="updateAllPreviews()">
         </div>
       </div>
 
@@ -77,52 +77,68 @@
 
       <div class="field-group">
         <label>Font Family</label>
-        <select id="s-font" onchange="onFontChange()">
-          <option value="">— Select Font —</option>
-          {% for f in fonts %}
-          <option value="{{ f.path }}" 
-                  data-name="{{ f.name }}"
-                  style="font-family: 'FontPreview_{{ loop.index }}';"
-                  {% if f.path == settings.font_path %}selected{% endif %}>
-            {{ f.name }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <button class="btn btn-secondary" style="width: 100%;" onclick="saveSettings()">
-        <span>Save Configuration</span>
-      </button>
-    </div>
-
-    <!-- Texts -->
-    <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2 style="margin: 0;">Sign Texts</h2>
-        <div style="display: flex; gap: 0.5rem;">
-          <button class="btn btn-secondary btn-icon" onclick="removeLastEntry()" title="Remove">－</button>
-          <button class="btn btn-secondary btn-icon" onclick="addEntry()" title="Add">＋</button>
+        <div class="custom-dropdown" id="font-dropdown">
+          <div class="dropdown-trigger" id="dropdown-trigger" onclick="toggleDropdown()">
+            <span id="trigger-label">— Select Font —</span>
+          </div>
+          <div class="dropdown-content" id="dropdown-content">
+            <div class="dropdown-search">
+              <input type="text" id="font-search" placeholder="Search fonts..." oninput="filterFonts(this.value)">
+            </div>
+            <div class="dropdown-list" id="font-list">
+              {% for f in fonts %}
+              <div class="dropdown-option" 
+                   data-path="{{ f.path }}" 
+                   data-name="{{ f.name }}"
+                   data-family="FontPreview_{{ loop.index }}"
+                   style="font-family: 'FontPreview_{{ loop.index }}';"
+                   onclick="selectFont('{{ f.path }}', '{{ f.name }}', 'FontPreview_{{ loop.index }}')">
+                {{ f.name }}
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <input type="hidden" id="s-font" value="{{ settings.font_path }}">
         </div>
       </div>
-      
-      <div id="entries" class="entry-list"></div>
+
+      <div class="card" style="padding: 1.5rem;">
+          <h2 style="margin-bottom: 1rem;">Stats</h2>
+          <div id="stats-info" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.8;">
+              Font Size: <span id="stat-font-size" style="color: var(--text); font-weight: 700;">—</span><br>
+              Signs: <span id="stat-count" style="color: var(--text);">—</span><br>
+              <div id="stat-limit-box" style="margin-top: 0.5rem; display: none;">
+                  Limited by: <span id="stat-limit" style="color: #ff9800; font-weight: 700;">—</span>
+              </div>
+          </div>
+      </div>
     </div>
   </div>
 
-  <!-- ═══ RIGHT COLUMN: EXPORT ═══ -->
+  <!-- ═══ RIGHT COLUMN: CONTENT & EXPORT ═══ -->
   <div class="preview-column">
-    <div class="preview-container">
+    <div class="preview-container" style="gap: 2rem;">
       
-      <div class="card">
-        <h2>Export & Mass Preview</h2>
-        <div class="preview-view" id="preview-box" style="margin-bottom: 1.5rem; min-height: 200px;">
-          <div class="empty-state">Live preview of all signs will appear here.</div>
+      <!-- Texts (White Card) -->
+      <div class="white-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+          <h2 style="margin: 0; font-size: 1.25rem;">Sign Texts</h2>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary btn-icon" onclick="removeLastEntry()" title="Remove">－</button>
+            <button class="btn btn-secondary btn-icon" onclick="addEntry()" title="Add">＋</button>
+          </div>
         </div>
+        
+        <div id="entries" class="entry-list"></div>
+      </div>
 
-        <div class="grid" style="grid-template-columns: 1fr auto; align-items: end; gap: 1rem;">
+      <!-- Export Card -->
+      <div class="card">
+        <h2>Export Package</h2>
+        <div class="grid" style="grid-template-columns: 1fr auto; align-items: end; gap: 1.5rem;">
           <div class="field-group" style="margin: 0;">
             <label>Export Format</label>
-            <select id="s-format">
+            <select id="s-format" onchange="markDirty()">
               <option value="3mf">3MF (Bambu/Prusa Multi-Color)</option>
               <option value="step">STEP (Universal CAD / Colors)</option>
             </select>
@@ -130,23 +146,11 @@
           
           <button id="gen-btn" class="btn btn-success" onclick="doGenerate()">
             <div class="loader"></div>
-            <span>🚀 Generate & Download All</span>
+            <span id="gen-btn-text">🚀 Generate & Download All</span>
           </button>
-        </div>
-
-        <div id="dl-link-container" style="margin-top: 1rem; display: none; text-align: center;">
-             <a id="dl-link" class="btn btn-primary"><span>⬇️ Re-download Package</span></a>
         </div>
         
         <div id="status-toast" class="status-toast" style="margin-top: 1rem;"></div>
-      </div>
-
-      <div class="card">
-          <h2>Stats</h2>
-          <div id="stats-info" style="font-size: 0.85rem; color: var(--text-muted);">
-              Calculated Font Size: <span id="stat-font-size">—</span><br>
-              Total Signs: <span id="stat-count">—</span>
-          </div>
       </div>
 
     </div>
@@ -155,46 +159,113 @@
 </div>
 
 <script>
+  let currentFontFamily = "sans-serif";
   let previewTimeout = null;
+  let lastGeneratedState = null;
 
-  // --- Dynamic Font Loading ---
+  // --- Premium Font Dropdown Logic ---
   function initFonts() {
     const styleEl = document.getElementById('dynamic-fonts');
-    const select = document.getElementById('s-font');
+    const options = document.querySelectorAll('.dropdown-option');
     let css = "";
     
-    [...select.options].forEach((opt, idx) => {
-      if (!opt.value) return;
-      const fontUrl = `/api/font?path=${encodeURIComponent(opt.value)}`;
+    options.forEach((opt, idx) => {
+      const path = opt.getAttribute('data-path');
+      const fontUrl = `/api/font?path=${encodeURIComponent(path)}`;
       css += `
         @font-face {
-          font-family: 'FontPreview_${idx}';
+          font-family: 'FontPreview_${idx + 1}';
           src: url('${fontUrl}');
         }
       `;
+      
+      // Set initial trigger state
+      if (path === document.getElementById('s-font').value) {
+         const family = `FontPreview_${idx + 1}`;
+         currentFontFamily = family;
+         setTrigger(opt.getAttribute('data-name'), family);
+         opt.classList.add('selected');
+      }
     });
     styleEl.innerHTML = css;
+    updateInputFonts();
   }
+
+  function toggleDropdown() {
+    const content = document.getElementById('dropdown-content');
+    const trigger = document.getElementById('dropdown-trigger');
+    const isOpen = content.classList.contains('show');
+    
+    // Close all first
+    document.querySelectorAll('.dropdown-content').forEach(c => c.classList.remove('show'));
+    document.querySelectorAll('.dropdown-trigger').forEach(t => t.classList.remove('active'));
+
+    if (!isOpen) {
+      content.classList.add('show');
+      trigger.classList.add('active');
+      document.getElementById('font-search').focus();
+    }
+  }
+
+  function setTrigger(name, family) {
+    const label = document.getElementById('trigger-label');
+    label.textContent = name;
+    label.style.fontFamily = family;
+  }
+
+  function updateInputFonts() {
+    document.querySelectorAll('.entry-item input').forEach(input => {
+      input.style.fontFamily = currentFontFamily;
+    });
+  }
+
+  function selectFont(path, name, family) {
+    document.getElementById('s-font').value = path;
+    currentFontFamily = family;
+    setTrigger(name, family);
+    updateInputFonts();
+    
+    document.querySelectorAll('.dropdown-option').forEach(opt => {
+      opt.classList.remove('selected');
+      if (opt.getAttribute('data-path') === path) opt.classList.add('selected');
+    });
+
+    document.getElementById('dropdown-content').classList.remove('show');
+    document.getElementById('dropdown-trigger').classList.remove('active');
+    
+    onFontChange();
+  }
+
+  function filterFonts(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('.dropdown-option').forEach(opt => {
+      const name = opt.getAttribute('data-name').toLowerCase();
+      opt.style.display = name.includes(q) ? 'block' : 'none';
+    });
+  }
+
+  // Global click to close
+  window.addEventListener('click', (e) => {
+    if (!e.target.closest('#font-dropdown')) {
+      document.getElementById('dropdown-content').classList.remove('show');
+      document.getElementById('dropdown-trigger').classList.remove('active');
+    }
+  });
 
   function addEntry(value = "") {
     const container = document.getElementById("entries");
     const idx = container.children.length + 1;
     const div = document.createElement("div");
     div.className = "entry-item";
-    div.style.flexDirection = "column";
-    div.style.alignItems = "stretch";
-    
     div.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <span class="entry-num">${idx}</span>
-        <input type="text" placeholder="Enter sign text..." value="${escHtml(value)}" oninput="onEntryInput()">
-      </div>
-      <div class="sign-mini-preview" style="height: 60px; margin-top: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--glass-border);">
-        <span style="font-size: 0.7rem; color: var(--text-muted); opacity: 0.5;">Preview...</span>
+      <input type="text" placeholder="Type here..." value="${escHtml(value)}" oninput="onEntryInput(this)">
+      <div class="sign-mini-preview">
+        <span style="font-size: 0.6rem; color: var(--text-muted); opacity: 0.5;">Preview</span>
       </div>
     `;
     container.appendChild(div);
     updateAllPreviews();
+    markDirty();
   }
 
   function removeLastEntry() {
@@ -202,24 +273,31 @@
     if (container.children.length > 1) {
       container.removeChild(container.lastChild);
       updateAllPreviews();
+      markDirty();
     }
   }
 
-  function onEntryInput() {
-    // Debounce preview for performance
+  function onEntryInput(inputEl) {
+    const container = document.getElementById("entries");
+    const isLastRow = inputEl.parentElement === container.lastChild;
+    
+    // Auto-append row if typing in the last one
+    if (isLastRow && inputEl.value.trim() !== "") {
+        addEntry();
+    }
+
+    markDirty();
     clearTimeout(previewTimeout);
     previewTimeout = setTimeout(() => {
         updateAllPreviews();
+        saveSettings();
     }, 400);
   }
 
   function onFontChange() {
-      const select = document.getElementById('s-font');
-      const selected = select.options[select.selectedIndex];
-      if (selected) {
-          select.style.fontFamily = selected.style.fontFamily;
-      }
+      markDirty();
       updateAllPreviews();
+      saveSettings();
   }
 
   function getTexts() {
@@ -229,11 +307,10 @@
   async function updateAllPreviews() {
     const texts = getTexts().filter(t => t.length > 0);
     if (texts.length === 0) {
-        document.getElementById("preview-box").innerHTML = `<div class="empty-state">Live preview of all signs will appear here.</div>`;
         document.getElementById("stat-font-size").textContent = "—";
         document.getElementById("stat-count").textContent = "—";
         document.querySelectorAll(".sign-mini-preview").forEach(mini => {
-            mini.innerHTML = `<span style="font-size: 0.7rem; color: var(--text-muted); opacity: 0.5;">Preview...</span>`;
+            mini.innerHTML = `<span style="font-size: 0.6rem; color: #aaa;">Preview</span>`;
         });
         return;
     }
@@ -247,42 +324,67 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      // Update Large Preview
-      document.getElementById("preview-box").innerHTML = data.svg;
+      // We removed the large preview box, but we could keep it hidden or use it for something else.
+      // For now, it's removed from HTML but let's just make sure we don't crash.
+      // document.getElementById("preview-box").innerHTML = data.svg;
       
-      // Update Stats
-      document.getElementById("stat-font-size").textContent = data.font_size + " pt";
+      // Update Stats & Highlighting
+      document.getElementById("stat-font-size").textContent = data.font_size.toFixed(2) + " mm";
       document.getElementById("stat-count").textContent = texts.length;
+      
+      const limitBox = document.getElementById("stat-limit-box");
+      const limitText = document.getElementById("stat-limit");
+      if (data.limiting_text) {
+          limitBox.style.display = "block";
+          limitText.textContent = `"${data.limiting_text}"`;
+      } else {
+          limitBox.style.display = "none";
+      }
 
-      // Update Individual Mini-Previews
+      // Update Individual Mini-Previews and Highlight Bottleneck
       const entries = document.querySelectorAll(".entry-item");
       const settings = getCurrentSettings();
+
+      entries.forEach(entry => entry.classList.remove("bottleneck"));
+
       texts.forEach((txt, idx) => {
           if (entries[idx]) {
               const mini = entries[idx].querySelector(".sign-mini-preview");
+              
+              // Highlight if this is the limiting sign
+              if (txt === data.limiting_text) {
+                  entries[idx].classList.add("bottleneck");
+              }
+
               mini.innerHTML = `
-                <svg width="100%" height="100%" viewBox="0 0 ${settings.width} ${settings.height}" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="0" y="0" width="${settings.width}" height="${settings.height}" fill="${settings.bg_color}" />
+                <svg width="100%" height="100%" viewBox="0 0 ${settings.width} ${settings.height}" 
+                     preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="0" y="0" width="${settings.width}" height="${settings.height}" fill="${settings.bg_color}" rx="1" ry="1" />
                   <text x="${settings.width/2}" y="${settings.height/2}" fill="${settings.text_color}" 
-                        font-family="sans-serif" font-size="${data.font_size * 0.8}px" 
+                        font-family="${currentFontFamily}" font-size="${data.font_size * 0.8}px" 
                         text-anchor="middle" dominant-baseline="central">${escHtml(txt)}</text>
                 </svg>
               `;
           }
       });
     } catch (e) {
-      console.error(e);
+      console.error("Preview Error:", e);
     }
   }
 
   function getCurrentSettings() {
+    const val = (id, def) => {
+        const v = parseFloat(document.getElementById(id).value);
+        return isNaN(v) ? def : v;
+    };
+    
     return {
-      width: parseFloat(document.getElementById("s-width").value) || 120,
-      height: parseFloat(document.getElementById("s-height").value) || 40,
-      min_margin: parseFloat(document.getElementById("s-margin").value) || 3,
-      base_thickness: parseFloat(document.getElementById("s-base-h").value) || 2,
-      text_thickness: parseFloat(document.getElementById("s-text-h").value) || 1.5,
-      text_protrusion: parseFloat(document.getElementById("s-protrusion").value) || 1.5,
+      width: val("s-width", 120),
+      height: val("s-height", 40),
+      min_margin: val("s-margin", 3),
+      base_thickness: val("s-base-h", 2),
+      text_thickness: val("s-text-h", 1.5),
+      text_protrusion: val("s-protrusion", 0),
       bg_color: document.getElementById("s-bg-color").value,
       text_color: document.getElementById("s-text-color").value,
       font_path: document.getElementById("s-font").value,
@@ -290,12 +392,14 @@
   }
 
   async function saveSettings() {
-    await fetch("/api/settings", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(getCurrentSettings()),
-    });
-    showToast("Configuration saved.", "success");
+    markDirty();
+    try {
+        await fetch("/api/settings", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(getCurrentSettings()),
+        });
+    } catch(e) { console.error("Auto-save failed", e); }
   }
 
   function showToast(msg, type = "info") {
@@ -306,11 +410,24 @@
     setTimeout(() => { t.style.display = "none"; }, 5000);
   }
 
+  function markDirty() {
+     document.getElementById("gen-btn-text").textContent = "🚀 Generate & Download All";
+  }
+
   async function doGenerate() {
     const texts = getTexts().filter(t => t.length > 0);
     if (texts.length === 0) return showToast("Please enter some text for the signs.", "error");
 
+    const settings = getCurrentSettings();
     const format = document.getElementById("s-format").value;
+    const currentState = JSON.stringify({ texts, settings, format });
+
+    // "Smart" Download: If state is same, just download.
+    if (lastGeneratedState === currentState) {
+        showToast("Re-downloading existing package...", "info");
+        window.location.href = "/api/download";
+        return;
+    }
 
     const btn = document.getElementById("gen-btn");
     btn.classList.add("loading");
@@ -320,19 +437,15 @@
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ texts, format, settings: getCurrentSettings() }),
+        body: JSON.stringify({ texts, format, settings }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
       showToast("Generation successful! Downloading...", "success");
+      lastGeneratedState = currentState;
+      document.getElementById("gen-btn-text").textContent = "⬇️ Download Again";
       window.location.href = "/api/download";
-      
-      const dlCont = document.getElementById("dl-link-container");
-      const dlLink = document.getElementById("dl-link");
-      dlLink.href = "/api/download";
-      dlLink.querySelector("span").textContent = `⬇️ Re-download ${data.filename}`;
-      dlCont.style.display = "block";
       
     } catch (e) {
       showToast("Error: " + e.message, "error");
@@ -348,7 +461,9 @@
 
   // Init
   initFonts();
-  addEntry("SIGN ONE"); addEntry("SIGN TWO");
+  addEntry("SIGN ONE"); 
+  addEntry("SIGN TWO");
+  addEntry(""); // Start with one empty row
   onFontChange();
 </script>
 

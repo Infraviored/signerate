@@ -15,6 +15,20 @@ LAST_GENERATED = {
     "mimetype": "model/3mf"
 }
 
+def log_info(msg):
+    print(f"[INFO] {msg}")
+    sys.stdout.flush()
+
+def log_debug(msg, data=None):
+    print(f"[DEBUG] {msg}")
+    if data:
+        import json
+        try:
+            print(json.dumps(data, indent=2))
+        except:
+            print(data)
+    sys.stdout.flush()
+
 def log_error(e):
     print("\n" + "!" * 80)
     print(f"!!! CRITICAL SERVER ERROR: {str(e)}")
@@ -61,28 +75,51 @@ def api_preview():
     data     = request.get_json(force=True)
     texts    = data.get("texts", [])
     settings = load_settings()
-    settings.update({k: v for k, v in data.get("settings", {}).items() if k in settings})
+    
+    # Merge incoming settings
+    incoming_settings = data.get("settings", {})
+    for k, v in incoming_settings.items():
+        if k in settings:
+            settings[k] = v
+
+    log_debug(f"Preview Request (signs={len(texts)})", {"texts": texts, "settings": incoming_settings})
 
     font_path = settings.get("font_path", "")
-    if not font_path or not os.path.exists(font_path):
-        return jsonify({"error": "No valid font selected."}), 400
+    # Sanitize Windows paths from JS
+    if font_path:
+        font_path = font_path.replace("/", "\\")
+        settings["font_path"] = font_path
+
+    if not font_path:
+        log_info("Preview failed: No font_path key in settings.")
+        return jsonify({"error": "No font selected in settings."}), 400
+    
+    if not os.path.exists(font_path):
+        log_info(f"Preview failed: Font path does not exist: {font_path}")
+        return jsonify({"error": f"Font file not found: {font_path}"}), 400
 
     clean = [t for t in texts if t.strip()]
     if not clean:
         return jsonify({"error": "Please enter at least one text."}), 400
 
-    available_w = settings["width"]  - 2 * settings["min_margin"]
-    available_h = settings["height"] - 2 * settings["min_margin"]
+    available_w = float(settings["width"])  - 2 * float(settings["min_margin"])
+    available_h = float(settings["height"]) - 2 * float(settings["min_margin"])
 
     try:
-        font_size = calculate_optimal_font_size(clean, font_path, available_w, available_h)
+        import time
+        start_t = time.time()
+        font_size, limiting_text = calculate_optimal_font_size(clean, font_path, available_w, available_h)
         svg = generate_preview_svg(texts, settings)
+        duration = time.time() - start_t
+        
+        log_info(f"Preview generated in {duration:.2f}s (font_size={font_size:.2f})")
         
         return jsonify({
-            "font_size":   round(font_size, 2),
-            "sign_count":  len(clean),
-            "available_w": round(available_w, 2),
-            "available_h": round(available_h, 2),
+            "font_size":     round(font_size, 2),
+            "limiting_text": limiting_text,
+            "sign_count":    len(clean),
+            "available_w":  round(available_w, 2),
+            "available_h":  round(available_h, 2),
             "svg": svg
         })
     except Exception as e:
@@ -94,13 +131,24 @@ def api_preview():
 def api_generate():
     data     = request.get_json(force=True)
     texts    = data.get("texts", [])
-    fmt      = data.get("format", "3mf").lower() # "3mf" or "step"
+    fmt      = data.get("format", "3mf").lower()
     settings = load_settings()
-    settings.update({k: v for k, v in data.get("settings", {}).items() if k in settings})
+    
+    incoming_settings = data.get("settings", {})
+    for k, v in incoming_settings.items():
+        if k in settings:
+            settings[k] = v
+
+    log_debug(f"Generate Request ({fmt})", {"settings": incoming_settings})
 
     font_path = settings.get("font_path", "")
+    if font_path:
+        font_path = font_path.replace("/", "\\")
+        settings["font_path"] = font_path
+
     if not font_path or not os.path.exists(font_path):
-        return jsonify({"error": "No valid font selected."}), 400
+        log_info(f"Generate failed: Invalid font path: {font_path}")
+        return jsonify({"error": f"Invalid font path: {font_path}"}), 400
     if not any(t.strip() for t in texts):
         return jsonify({"error": "Please enter at least one text."}), 400
 
