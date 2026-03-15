@@ -17,11 +17,11 @@ DEFAULT_SETTINGS = {
     "width": 120.0,
     "height": 40.0,
     "min_margin": 3.0,
-    "base_thickness": 2.0,
-    "text_thickness": 1.5,   # visible / flush text height and pocket depth
+    "base_thickness": 2.0,   # Total thickness of the sign plate (background)
+    "text_thickness": 1.5,   # Full vertical extrusion height of the letters
     "bg_color": "#ffffff",
     "text_color": "#000000",
-    "text_protrusion": 0.0,
+    "text_protrusion": 0.0,  # 0 = Flush with top surface. Positive = sticks out.
     "font_path": "",
     "export_format": "3mf"
 }
@@ -37,7 +37,7 @@ def load_settings() -> dict:
 
 def save_settings(settings: dict):
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(settings, f, indent=2)
+        json.dump(settings, f, indent=2, ensure_ascii=False)
 
 
 def hex_to_hex(hex_color: str) -> str:
@@ -89,6 +89,15 @@ def find_system_fonts() -> List[dict]:
 
     fonts.sort(key=lambda x: x["name"].lower())
     return fonts
+
+
+def find_arial_path() -> str:
+    """Returns the path to the Arial font if found, otherwise the first system font."""
+    fonts = find_system_fonts()
+    for f in fonts:
+        if "arial" in f["name"].lower():
+            return f["path"]
+    return fonts[0]["path"] if fonts else ""
 
 
 def _safe_name(text: str, max_len: int = 48) -> str:
@@ -171,11 +180,13 @@ def calculate_optimal_font_size(
         text_h = bb.ymax - bb.ymin
         if text_w <= 0 or text_h <= 0: continue
 
+        # Scale based on geometric bounding box
         scale_w = available_width / text_w
         scale_h = available_height / text_h
         
         # The actual scale for this sign is min(scale_w, scale_h)
-        local_scale = min(scale_w, scale_h)
+        # Apply a small safety factor (e.g. 0.975) to account for tessellation variations
+        local_scale = min(scale_w, scale_h) * 0.975
         
         if local_scale < max_scale:
             max_scale = local_scale
@@ -225,18 +236,28 @@ def generate_preview_svg(
         f'<svg width="{width}mm" height="{total_height}mm" viewBox="0 0 {width} {total_height}" xmlns="http://www.w3.org/2000/svg">'
     ]
 
+    align = settings.get("horizontal_align", "center").lower()
+    x_pos = width / 2
+    anchor = "middle"
+    
+    if align == "left":
+        x_pos = margin
+        anchor = "start"
+    elif align == "right":
+        x_pos = width - margin
+        anchor = "end"
+
     for i, text in enumerate(clean_texts):
         y_offset = i * (height + spacing)
         
         # Background Rect
         svg.append(f'  <rect x="0" y="{y_offset}" width="{width}" height="{height}" fill="{bg_color}" rx="2" ry="2" />')
         
-        # Placeholder for Text (SVG text rendering is approximate, but good for layout)
-        # We use a generic sans-serif for the browser but position it according to the CQ math
+        # Text positioning in SVG
         svg.append(
-            f'  <text x="{width/2}" y="{y_offset + height/2}" '
+            f'  <text x="{x_pos}" y="{y_offset + height/2}" '
             f'fill="{tx_color}" font-family="sans-serif" font-size="{font_size * 0.9}px" '
-            f'text-anchor="middle" dominant-baseline="central" style="pointer-events:none;">'
+            f'text-anchor="{anchor}" dominant-baseline="central" style="pointer-events:none;">'
             f'{_xml_attr(text)}'
             f'</text>'
         )
@@ -317,14 +338,43 @@ def generate_signs(
         
         print(f"  Sign '{text}': Z_bottom={text_z_bottom:.3f}, Z_top={text_z_top:.3f}")
 
-        # 1. Generate Letter Solid
+        # 1. Generate Letter Solid (Temporary for bounding box)
+        text_align = settings.get("horizontal_align", "center").lower()
+        
         letters_raw = (
             cq.Workplane("XY")
-            .workplane(offset=text_z_bottom)
             .text(text, fontsize=font_size, distance=text_h, fontPath=font_path,
                   halign="center", valign="center")
         )
-        letters_shape = _fuse_all_solids(letters_raw, tol=pocket_tol).clean()
+        # We use a temporary object to find the GEOMETRIC center
+        bb = letters_raw.val().BoundingBox()
+        
+        # Calculate Offsets
+        # Center horizontally vs left/right
+        h_offset = 0
+        if text_align == "left":
+            # (bb.xmin+bb.xmax)/2 is where the center IS currently.
+            # We want bb.xmin to be at -available_w / 2
+            available_w = width - 2 * min_margin
+            h_offset = (-available_w / 2) - bb.xmin
+        elif text_align == "right":
+            # We want bb.xmax to be at available_w / 2
+            available_w = width - 2 * min_margin
+            h_offset = (available_w / 2) - bb.xmax
+        else:
+            # Geometric center horizontally
+            h_offset = - (bb.xmin + bb.xmax) / 2
+            
+        # Vertical: Always geometric center
+        v_offset = - (bb.ymin + bb.ymax) / 2
+        
+        # Final Letter Shape translated to correct 3D spot
+        letters_shape = (
+            letters_raw
+            .translate((h_offset, v_offset, text_z_bottom))
+            .clean()
+            .val()
+        )
 
         # 2. Generate Pocket
         # Pocket depth is only the part that is below the top surface
@@ -333,11 +383,15 @@ def generate_signs(
         if pocket_depth > 0.001:
             pocket_raw = (
                 cq.Workplane("XY")
-                .workplane(offset=text_z_bottom)
                 .text(text, fontsize=font_size, distance=pocket_depth + top_opening_overshoot,
-                fontPath=font_path, halign="center", valign="center")
+                      fontPath=font_path, halign="center", valign="center")
             )
-            pocket_shape = _fuse_all_solids(pocket_raw, tol=pocket_tol).clean()
+            pocket_shape = (
+                pocket_raw
+                .translate((h_offset, v_offset, text_z_bottom))
+                .clean()
+                .val()
+            )
 
             # 3. Cut Background
             base_solid = cq.Workplane("XY").box(width, height, base_h, centered=(True, True, False)).val()

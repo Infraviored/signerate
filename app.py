@@ -3,9 +3,12 @@ import sys
 import traceback
 from flask import Flask, render_template, request, jsonify, send_file
 from generator import (
-    load_settings, save_settings, find_system_fonts,
+    load_settings, save_settings, find_system_fonts, find_arial_path,
     calculate_optimal_font_size, generate_signs, generate_preview_svg
 )
+import json
+import glob
+from pathlib import Path
 
 app = Flask(__name__)
 
@@ -185,5 +188,68 @@ def api_download():
     )
 
 
+# --- Set Management ---
+
+SETS_DIR = Path("sets")
+
+def init_sets():
+    """Seeds the Workshop Signs set if no sets exist."""
+    if not SETS_DIR.exists():
+        SETS_DIR.mkdir()
+    
+    existing = list(SETS_DIR.glob("*.json"))
+    if not existing:
+        log_info("Seeding default 'Workshop' set...")
+        default_set = {
+            "name": "Workshop",
+            "settings": {
+                "width": 120,
+                "height": 40,
+                "min_margin": 5.0,
+                "base_thickness": 2.0,
+                "text_thickness": 0.8,
+                "font_path": find_arial_path(),
+                "bg_color": "#000000",
+                "text_color": "#ffffff",
+                "export_format": "3mf"
+            },
+            "texts": ["Screws", "Nuts"]
+        }
+        with open(SETS_DIR / "Workshop.json", "w", encoding="utf-8") as f:
+            json.dump(default_set, f, indent=4, ensure_ascii=False)
+
+@app.route("/api/sets", methods=["GET"])
+def api_list_sets():
+    sets = []
+    for p in SETS_DIR.glob("*.json"):
+        sets.append(p.stem)
+    return jsonify(sorted(sets))
+
+@app.route("/api/sets/<name>", methods=["GET"])
+def api_get_set(name):
+    path = SETS_DIR / f"{name}.json"
+    if not path.exists():
+        return jsonify({"error": "Set not found"}), 404
+    with open(path, "r", encoding="utf-8") as f:
+        return jsonify(json.load(f))
+
+@app.route("/api/sets", methods=["POST"])
+def api_save_set():
+    data = request.get_json(force=True)
+    name = data.get("name", "Unnamed Set")
+    # Sanitize just in case
+    safe_name = "".join([c for c in name if c.isalnum() or c in (' ', '_', '-')]).strip()
+    if not safe_name: safe_name = "Unnamed Set"
+    
+    path = SETS_DIR / f"{safe_name}.json"
+    log_info(f"Saving set: {path}")
+    
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+    
+    return jsonify({"ok": True, "name": safe_name})
+
+
 if __name__ == "__main__":
+    init_sets()
     app.run(debug=True, port=5000)
