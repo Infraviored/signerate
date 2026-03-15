@@ -57,19 +57,27 @@ def _clean_mesh(verts, faces, weld_eps: float = 1e-7):
     return clean_verts, clean_faces
 
 
-def _build_3mf_xml(objects: list) -> str:
+def _build_3mf_xml(groups: list) -> str:
     """
-    Builds the 3dmodel.model XML content.
-    Expects a list of dicts: { 'name': str, 'verts': List[List[float]], 'faces': List[List[int]], 'color': '#RRGGBB' }
+    Builds the 3dmodel.model XML content with component grouping.
+    Expects a list of groups: {
+        'name': '00_Sign',
+        'parts': [
+            {'name': 'PartA', 'verts': v, 'faces': f, 'color': '#c'},
+            ...
+        ]
+    }
     """
     core_ns = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
     mat_ns = "http://schemas.microsoft.com/3dmanufacturing/material/2015/02"
 
+    # 1. Collect all unique colors across all groups/parts
     colors = []
-    for obj in objects:
-        c = _normalize_color(obj["color"])
-        if c not in colors:
-            colors.append(c)
+    for group in groups:
+        for part in group["parts"]:
+            c = _normalize_color(part["color"])
+            if c not in colors:
+                colors.append(c)
 
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -80,35 +88,52 @@ def _build_3mf_xml(objects: list) -> str:
 
     for c in colors:
         lines.append(f'      <m:color color="{c}"/>')
-
     lines.append("    </m:colorgroup>")
 
-    # Each object gets its own ID starting from 2
-    for i, obj in enumerate(objects, start=2):
-        color = _normalize_color(obj["color"])
-        color_index = colors.index(color)
+    next_id = 2
+    group_info = []
+
+    # 2. Define Mesh Objects (Resources)
+    for group in groups:
+        part_ids = []
+        for part in group["parts"]:
+            color = _normalize_color(part["color"])
+            color_index = colors.index(color)
+            obj_id = next_id
+            next_id += 1
+            part_ids.append(obj_id)
+
+            lines.append(f'    <object id="{obj_id}" type="model" name="{_xml_attr(part["name"])}" pid="1" pindex="{color_index}">')
+            lines.append("      <mesh>")
+            lines.append("        <vertices>")
+            for v in part["verts"]:
+                lines.append(f'          <vertex x="{v[0]:.6f}" y="{v[1]:.6f}" z="{v[2]:.6f}"/>')
+            lines.append("        </vertices>")
+            lines.append("        <triangles>")
+            for f in part["faces"]:
+                lines.append(f'          <triangle v1="{f[0]}" v2="{f[1]}" v3="{f[2]}"/>')
+            lines.append("        </triangles>")
+            lines.append("      </mesh>")
+            lines.append("    </object>")
         
-        lines.append(f'    <object id="{i}" type="model" name="{_xml_attr(obj["name"])}" pid="1" pindex="{color_index}">')
-        lines.append("      <mesh>")
-        lines.append("        <vertices>")
-        for v in obj["verts"]:
-            lines.append(f'          <vertex x="{v[0]:.6f}" y="{v[1]:.6f}" z="{v[2]:.6f}"/>')
-        lines.append("        </vertices>")
-        lines.append("        <triangles>")
-        for f in obj["faces"]:
-            lines.append(f'          <triangle v1="{f[0]}" v2="{f[1]}" v3="{f[2]}"/>')
-        lines.append("        </triangles>")
-        lines.append("      </mesh>")
+        # 3. Define Compoment/Group Object
+        group_id = next_id
+        next_id += 1
+        group_info.append(group_id)
+        
+        lines.append(f'    <object id="{group_id}" type="model" name="{_xml_attr(group["name"])}">')
+        lines.append("      <components>")
+        for p_id in part_ids:
+            lines.append(f'        <component objectid="{p_id}"/>')
+        lines.append("      </components>")
         lines.append("    </object>")
 
     lines.append("  </resources>")
     lines.append("  <build>")
     
-    # We want to group pairs (Background + Text) into components so they stay relative to each other
-    # But for now, let's just output them and see if the color works first.
-    # Actually, let's try to output them as separate items like Step 666 did.
-    for i in range(len(objects)):
-        lines.append(f'    <item objectid="{i + 2}"/>')
+    # 4. Only Add the Group Objects to Build
+    for g_id in group_info:
+        lines.append(f'    <item objectid="{g_id}"/>')
         
     lines.append("  </build>")
     lines.append("</model>")
@@ -116,21 +141,27 @@ def _build_3mf_xml(objects: list) -> str:
     return "\n".join(lines)
 
 
-def save_3mf(objects: list, output_path: str):
+def save_3mf(groups: list, output_path: str):
     """
-    Saves a list of objects as a valid 3MF package.
+    Saves a list of groups as a valid 3MF package.
     """
-    cleaned_objects = []
-    for obj in objects:
-        v, f = _clean_mesh(obj["verts"], obj["faces"])
-        cleaned_objects.append({
-            "name": obj["name"],
-            "verts": v,
-            "faces": f,
-            "color": obj["color"]
+    cleaned_groups = []
+    for group in groups:
+        cleaned_parts = []
+        for part in group["parts"]:
+            v, f = _clean_mesh(part["verts"], part["faces"])
+            cleaned_parts.append({
+                "name": part["name"],
+                "verts": v,
+                "faces": f,
+                "color": part["color"]
+            })
+        cleaned_groups.append({
+            "name": group["name"],
+            "parts": cleaned_parts
         })
         
-    model_xml = _build_3mf_xml(cleaned_objects)
+    model_xml = _build_3mf_xml(cleaned_groups)
 
     content_types = """<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">

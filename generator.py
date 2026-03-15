@@ -356,6 +356,11 @@ def generate_signs(
             progress_callback(i, len(clean_texts))
         
         safe = _safe_name(text)
+        # Calculate padding for numeric prefix
+        pad = max(2, len(str(len(clean_texts))))
+        idx_str = str(i).zfill(pad)
+        sign_name = f"{idx_str}_{safe}"
+
         y_offset = i * (height + spacing)
         
         # Text always ends at base_h + protrusion
@@ -428,33 +433,33 @@ def generate_signs(
             base_cut_shape = cq.Workplane("XY").box(width, height, base_h, centered=(True, True, False)).val()
 
         if export_type.lower() == "3mf":
-            # Tessellieren für 3MF
+            # Hierarchical structure for 3MF
             base_verts, base_faces = _tessellate(
-                base_cut_shape,
-                y_offset=y_offset,
-                tolerance=tess_tol,
-                ang_tol=tess_ang_tol,
+                base_cut_shape, y_offset=y_offset, tolerance=tess_tol, ang_tol=tess_ang_tol
             )
             text_verts, text_faces = _tessellate(
-                letters_shape,
-                y_offset=y_offset,
-                tolerance=tess_tol,
-                ang_tol=tess_ang_tol,
+                letters_shape, y_offset=y_offset, tolerance=tess_tol, ang_tol=tess_ang_tol
             )
+            
             objects_3mf.append({
-                "name": f"Background_{safe}_{i}",
-                "verts": base_verts, "faces": base_faces, "color": bg_color_hex
-            })
-            objects_3mf.append({
-                "name": f"{safe}_{i}",
-                "verts": text_verts, "faces": text_faces, "color": tx_color_hex
+                "name": sign_name,
+                "parts": [
+                    {
+                        "name": f"{sign_name}_Background",
+                        "verts": base_verts, "faces": base_faces, "color": bg_color_hex
+                    },
+                    {
+                        "name": f"{sign_name}-text",
+                        "verts": text_verts, "faces": text_faces, "color": tx_color_hex
+                    }
+                ]
             })
         else:
-            # Assembly für STEP
+            # Assembly for STEP (keep hierarchical)
             loc = Location(Vector(0, y_offset, 0))
-            sign_assy = cq.Assembly(name=f"Sign_{safe}_{i}", loc=loc)
-            sign_assy.add(base_cut_shape, name="Background", color=Color(bg_r, bg_g, bg_b))
-            sign_assy.add(letters_shape, name="Text", color=Color(tx_r, tx_g, tx_b))
+            sign_assy = cq.Assembly(name=sign_name, loc=loc)
+            sign_assy.add(base_cut_shape, name=f"{sign_name}_Background", color=Color(bg_r, bg_g, bg_b))
+            sign_assy.add(letters_shape, name=f"{sign_name}-text", color=Color(tx_r, tx_g, tx_b))
             assy.add(sign_assy)
 
     if export_type.lower() == "3mf":
