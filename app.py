@@ -91,7 +91,6 @@ def api_preview():
     font_path = settings.get("font_path", "")
     # Sanitize Windows paths from JS
     if font_path:
-        font_path = font_path.replace("/", "\\")
         settings["font_path"] = font_path
 
     if not font_path:
@@ -147,7 +146,6 @@ def api_generate():
 
     font_path = settings.get("font_path", "")
     if font_path:
-        font_path = font_path.replace("/", "\\")
         settings["font_path"] = font_path
 
     if not font_path or not os.path.exists(font_path):
