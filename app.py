@@ -194,10 +194,14 @@ def api_download():
     if not os.path.exists(path):
         return jsonify({"error": "No file generated yet."}), 404
         
+    name = request.args.get("name", os.path.basename(path))
+    if not name.endswith((".3mf", ".step")):
+        name = os.path.basename(path)
+        
     return send_file(
         os.path.abspath(path),
         as_attachment=True,
-        download_name=os.path.basename(path),
+        download_name=name,
         mimetype=LAST_GENERATED["mimetype"],
     )
 

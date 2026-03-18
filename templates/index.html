@@ -146,6 +146,47 @@
   <div class="preview-column">
     <div class="preview-container" style="gap: 2rem;">
       
+      <!-- Export Card -->
+      <div class="card" style="border: 2px solid var(--primary-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2 style="margin: 0;">Export Package</h2>
+          <button id="gen-btn" class="btn btn-success" onclick="doGenerate()" style="margin: 0; min-width: 200px;">
+            <div class="loader"></div>
+            <span id="gen-btn-text">🚀 Generate & Download</span>
+          </button>
+        </div>
+        
+        <div class="grid" style="grid-template-columns: 1fr 1fr; align-items: end; gap: 1.5rem;">
+          <div class="field-group" style="margin: 0;">
+            <div class="label-wrapper">
+              <label>Export Format</label>
+              <span class="help-icon" data-tooltip="3MF is best for Bambu/Prusa slicers. STEP is best for CAD editing.">?</span>
+            </div>
+            <select id="s-format" onchange="markDirty()">
+              <option value="3mf">3MF (Bambu/Prusa Multi-Color)</option>
+              <option value="step">STEP (Universal CAD / Colors)</option>
+            </select>
+          </div>
+
+          <div class="field-group" style="margin: 0;">
+            <div class="label-wrapper">
+              <label>Export Scope (Versions)</label>
+              <span class="help-icon" data-tooltip="Choose to export all signs or only new ones added since a specific version.">?</span>
+            </div>
+            <select id="s-export-scope" onchange="markDirty()">
+              <option value="all">All Signs</option>
+            </select>
+          </div>
+        </div>
+        
+        <div id="status-toast" class="status-toast" style="margin-top: 1rem;"></div>
+        
+        <div id="gen-progress-container" class="progress-container">
+          <div id="gen-progress-bar" class="progress-bar"></div>
+        </div>
+        <div id="gen-progress-text" class="progress-text">Generating...</div>
+      </div>
+
       <!-- Texts (White Card) -->
       <div class="white-card">
         <h2>
@@ -167,35 +208,6 @@
         </h2>
         
         <div id="entries" class="entry-list"></div>
-      </div>
-
-      <!-- Export Card -->
-      <div class="card">
-        <h2>Export Package</h2>
-        <div class="grid" style="grid-template-columns: 1fr auto; align-items: end; gap: 1.5rem;">
-          <div class="field-group" style="margin: 0;">
-            <div class="label-wrapper">
-              <label>Export Format</label>
-              <span class="help-icon" data-tooltip="3MF is best for Bambu/Prusa slicers. STEP is best for CAD editing.">?</span>
-            </div>
-            <select id="s-format" onchange="markDirty()">
-              <option value="3mf">3MF (Bambu/Prusa Multi-Color)</option>
-              <option value="step">STEP (Universal CAD / Colors)</option>
-            </select>
-          </div>
-          
-          <button id="gen-btn" class="btn btn-success" onclick="doGenerate()">
-            <div class="loader"></div>
-            <span id="gen-btn-text">🚀 Generate & Download All</span>
-          </button>
-        </div>
-        
-        <div id="status-toast" class="status-toast" style="margin-top: 1rem;"></div>
-        
-        <div id="gen-progress-container" class="progress-container">
-          <div id="gen-progress-bar" class="progress-bar"></div>
-        </div>
-        <div id="gen-progress-text" class="progress-text">Generating...</div>
       </div>
 
     </div>
@@ -505,9 +517,36 @@
   }
 
   let lastSavedSetJson = "";
+  let currentVersions = [];
+
+  function getNewStatusesSince(versionId) {
+    const inputs = [...document.querySelectorAll(".entry-item input")];
+    if (versionId === "all") return inputs.map(i => !!i.value.trim());
+
+    const ver = currentVersions.find(v => v.id === versionId);
+    if (!ver) return inputs.map(i => !!i.value.trim());
+
+    const old = ver.texts.slice();
+    return inputs.map(input => {
+        const val = input.value.trim();
+        if (!val) return false;
+        const idx = old.indexOf(val);
+        if (idx !== -1) {
+            old.splice(idx, 1);
+            return false;
+        }
+        return true;
+    });
+  }
+
+  function getTextsByVersion(versionId) {
+      const inputs = [...document.querySelectorAll(".entry-item input")];
+      const statuses = getNewStatusesSince(versionId);
+      return inputs.map(i => i.value.trim()).filter((val, i) => val && statuses[i]);
+  }
 
   function markDirty() {
-     document.getElementById("gen-btn-text").textContent = "🚀 Generate & Download All";
+     document.getElementById("gen-btn-text").textContent = "🚀 Generate & Download";
      
      const currentSet = {
        name: document.getElementById("set-name-input").value,
@@ -517,21 +556,88 @@
      
      const currentJson = JSON.stringify(currentSet);
      const saveBtn = document.getElementById("btn-save");
+     const newItems = getTextsByVersion((currentVersions.length > 0) ? currentVersions[currentVersions.length - 1].id : "all");
      
      if (currentJson !== lastSavedSetJson) {
        saveBtn.classList.add("dirty");
+       if (newItems.length > 0) {
+           saveBtn.title = `Save Set (v${currentVersions.length + 1})`;
+       } else {
+           saveBtn.title = "Save Set";
+       }
      } else {
        saveBtn.classList.remove("dirty");
+       saveBtn.title = "Save Set";
      }
      
-     document.getElementById("set-count-badge").textContent = `(${currentSet.texts.filter(t => t.trim()).length})`;
+     const validTexts = currentSet.texts.filter(t => t.trim());
+     document.getElementById("set-count-badge").textContent = `(${validTexts.length})`;
+
+     // Update Export Scope Dropdown
+     const scopeSelect = document.getElementById("s-export-scope");
+     const currentVal = scopeSelect.value;
+     scopeSelect.innerHTML = `<option value="all">All Signs (${validTexts.length})</option>`;
+     
+     currentVersions.forEach(v => {
+         const statuses = getNewStatusesSince(v.id);
+         const count = statuses.filter(s => s).length;
+         if (count >= 0) { // always show, even if 0
+             const opt = document.createElement("option");
+             opt.value = v.id;
+             opt.textContent = `Since ${v.id} - ${v.date} (+${count} new)`;
+             scopeSelect.appendChild(opt);
+         }
+     });
+     
+     if ([...scopeSelect.options].some(o => o.value === currentVal)) {
+         scopeSelect.value = currentVal;
+     } else {
+         scopeSelect.value = "all";
+     }
+
+     // Highlight rows
+     const scope = document.getElementById("s-export-scope").value;
+     const statuses = getNewStatusesSince(scope);
+     const entriesDom = document.querySelectorAll(".entry-item");
+     entriesDom.forEach((el, i) => {
+         if (!validTexts[i] && !el.querySelector("input").value.trim()) {
+            el.style.opacity = "1";
+            el.style.borderLeft = "none";
+            return;
+         }
+         if (scope === "all" || statuses[i]) {
+            el.style.opacity = "1";
+            el.style.borderLeft = (scope !== "all") ? "4px solid var(--primary-color)" : "none";
+         } else {
+            el.style.opacity = "0.4";
+            el.style.borderLeft = "none";
+         }
+     });
   }
 
   async function saveSet() {
+      const newTexts = getTexts().filter(t => t.trim());
+      
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      
+      // Update Versions array
+      const existingJson = JSON.stringify(newTexts);
+      const lastV = currentVersions.length > 0 ? currentVersions[currentVersions.length - 1] : null;
+      
+      if (!lastV || JSON.stringify(lastV.texts) !== existingJson) {
+         currentVersions.push({
+             id: `v${currentVersions.length + 1}`,
+             date: dateStr,
+             texts: newTexts.slice()
+         });
+      }
+
       const set = {
           name: document.getElementById("set-name-input").value.trim() || "Untitled Set",
-          texts: getTexts().filter(t => t.trim()),
-          settings: getCurrentSettings()
+          texts: newTexts,
+          settings: getCurrentSettings(),
+          versions: currentVersions
       };
       
       try {
@@ -545,6 +651,7 @@
           
           document.getElementById("set-name-input").value = data.name;
           lastSavedSetJson = JSON.stringify(set);
+          savedStateTexts = set.texts.slice();
           markDirty();
           showToast(`Set "${data.name}" saved successfully!`, "success");
       } catch (e) {
@@ -586,8 +693,16 @@
           const set = await res.json();
           if (!res.ok) throw new Error(set.error);
           
-          // Update Name
           document.getElementById("set-name-input").value = set.name;
+          
+          if (!set.versions) {
+              set.versions = [{
+                  id: "v1",
+                  date: new Date().toISOString().split('T')[0],
+                  texts: set.texts.slice()
+              }];
+          }
+          currentVersions = set.versions;
           
           // Update Settings
           for (const [key, val] of Object.entries(set.settings)) {
@@ -603,7 +718,8 @@
           const entries = document.getElementById("entries");
           entries.innerHTML = "";
           set.texts.forEach(t => addEntry(t));
-          if (set.texts.length === 0) addEntry();
+          // Always maintain one empty slot at the end
+          addEntry("");
           
           // Specific UI updates
           await initFonts(); // Re-sync font dropdown
@@ -624,17 +740,42 @@
   }
 
   async function doGenerate() {
-    const texts = getTexts().filter(t => t.length > 0);
+    const scope = document.getElementById("s-export-scope").value;
+    const texts = getTextsByVersion(scope);
+    
     if (texts.length === 0) return showToast("Please enter some text for the signs.", "error");
 
     const settings = getCurrentSettings();
     const format = document.getElementById("s-format").value;
-    const currentState = JSON.stringify({ texts, settings, format });
+    
+    // Create Custom Filename
+    let baseName = document.getElementById("set-name-input").value.trim() || "Signs";
+    baseName = baseName.replace(/[^a-z0-9_-]/gi, '_');
+    
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0] + "_" + now.toTimeString().split(' ')[0].replace(/:/g, '-');
+    const count = texts.length;
+    
+    let targetId = "v1";
+    if (currentVersions.length > 0) targetId = currentVersions[currentVersions.length - 1].id;
+    if (document.getElementById("btn-save").classList.contains("dirty")) {
+        targetId = `v${currentVersions.length + 1}`;
+    }
+
+    let exportName = baseName;
+    if (scope !== "all") {
+        exportName = `${baseName}_${targetId}_Since_${scope}_${count}-Signs_${dateStr}`;
+    } else {
+        exportName = `${baseName}_${targetId}_${count}-Signs_${dateStr}`;
+    }
+    exportName += `.${format}`;
+
+    const currentState = JSON.stringify({ texts, settings, format, exportName });
 
     // "Smart" Download: If state is same, just download.
     if (lastGeneratedState === currentState) {
         showToast("Re-downloading existing package...", "info");
-        window.location.href = "/api/download";
+        window.location.href = `/api/download?name=${encodeURIComponent(exportName)}`;
         return;
     }
 
@@ -677,7 +818,7 @@
       showToast("Generation successful! Downloading...", "success");
       lastGeneratedState = currentState;
       document.getElementById("gen-btn-text").textContent = "⬇️ Download Again";
-      window.location.href = "/api/download";
+      window.location.href = `/api/download?name=${encodeURIComponent(exportName)}`;
       
     } catch (e) {
       showToast("Error: " + e.message, "error");
@@ -706,6 +847,7 @@
       } catch(e) {
           // Fallback if load fails
           addEntry();
+          currentVersions = [];
           onFontChange();
       }
   })();

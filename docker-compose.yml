@@ -8,6 +8,8 @@ services:
     volumes:
       - ./sets:/app/sets
       - ./settings.json:/app/settings.json
+      - ./templates:/app/templates
+      - ./static:/app/static
       - /usr/share/fonts:/usr/share/fonts:ro
     ports:
       - "15000:15000"

@@ -1,9 +1,9 @@
 {
   "width": 63,
   "height": 11,
-  "min_margin": 0.4,
+  "min_margin": 0.2,
   "base_thickness": 0.4,
-  "text_thickness": 0.4,
+  "text_thickness": 0.2,
   "bg_color": "#000000",
   "text_color": "#ffffff",
   "text_protrusion": 0,
