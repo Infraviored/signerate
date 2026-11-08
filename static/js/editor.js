@@ -8,6 +8,8 @@
     'text_protrusion', 'bg_color', 'text_color', 'font_path', 'horizontal_align', 'text_size', 'frame_width'];
   const PANEL_KEY = 'signerate.panelOpen';
   const DEST_KEY = 'signerate.destination';
+  const STACK_BELOW = 760; // workspace width in px; keep in step with the @container rule in style.css
+  const PHONE = window.matchMedia('(max-width: 720px)');
 
   const state = {
     name: $('editor').dataset.setName,
@@ -28,6 +30,9 @@
   const list = $('sign-list');
   const addInput = $('add-input');
   const nameInput = $('set-name');
+  const topbar = document.querySelector('.topbar');
+  const NAME_WIDE = 16; // characters; past this the name takes its own line on a phone
+  const fitName = () => topbar.classList.toggle('name-wide', nameInput.value.length > NAME_WIDE);
 
   // --- Serialised network access -------------------------------------------
 
@@ -190,8 +195,8 @@
   function applyPreview() {
     const st = set.settings;
     const room = $('workspace').clientWidth;
-    const narrow = window.matchMedia('(max-width: 720px)').matches;
-    scale = S.plateScale(st, narrow ? room - 32 : 300, narrow ? 140 : 100);
+    const narrow = room < STACK_BELOW; // rows stack: sign above its text, full width
+    scale = S.plateScale(st, narrow ? room - 32 : 300, narrow ? 170 : 100);
     $('workspace').style.setProperty('--plate-w', `${st.width * scale}px`);
 
     const p = state.preview;
@@ -257,6 +262,7 @@
 
   function openPanel(open) {
     $('panel').hidden = !open;
+    $('editor').classList.toggle('panel-open', open);
     $('open-panel').setAttribute('aria-pressed', String(open));
     try { localStorage.setItem(PANEL_KEY, open ? '1' : '0'); } catch (e) { /* private mode */ }
     applyPreview();
@@ -264,6 +270,13 @@
   $('open-panel').addEventListener('click', () => openPanel($('panel').hidden));
   $('close-panel').addEventListener('click', () => openPanel(false));
   window.addEventListener('resize', S.debounce(applyPreview, 100));
+
+  // The toasts sit just above the export bar, however tall it wraps.
+  if (window.ResizeObserver) {
+    new ResizeObserver(([entry]) => {
+      document.documentElement.style.setProperty('--bar-h', `${Math.ceil(entry.target.offsetHeight)}px`);
+    }).observe(document.querySelector('.export-bar'));
+  }
 
   function onSettingsChange(values, valid) {
     state.formInvalid = !valid;
@@ -498,7 +511,7 @@
 
   async function rename() {
     const wanted = nameInput.value.trim();
-    if (wanted === state.name) { nameInput.value = state.name; return; }
+    if (wanted === state.name) { nameInput.value = state.name; fitName(); return; }
     try {
       const data = await enqueue(async () => {
         await doSave().catch(() => {});
@@ -507,18 +520,21 @@
       state.name = data.name;
       set.name = data.name;
       nameInput.value = data.name;
+      fitName();
       nameError.hidden = true;
       document.title = `${data.name} - Signerate`;
       history.replaceState(null, '', S.editorUrl(data.name));
     } catch (e) {
       nameInput.value = state.name;
+      fitName();
       showNameError(e.message);
     }
   }
   nameInput.addEventListener('blur', rename);
+  nameInput.addEventListener('input', fitName);
   nameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') nameInput.blur();
-    if (e.key === 'Escape') { nameInput.value = state.name; nameInput.blur(); }
+    if (e.key === 'Escape') { nameInput.value = state.name; fitName(); nameInput.blur(); }
   });
 
   // --- Export ---------------------------------------------------------------
@@ -637,11 +653,13 @@
   // --- Start ----------------------------------------------------------------
 
   nameInput.value = set.name;
+  fitName();
   document.title = `${set.name} - Signerate`;
   let panelOpen = false;
   try { panelOpen = localStorage.getItem(PANEL_KEY) === '1'; } catch (e) { /* private mode */ }
-  if (panelOpen) {
+  if (panelOpen && !PHONE.matches) { // on a phone the sheet covers half the screen: start closed
     $('panel').hidden = false;
+    $('editor').classList.add('panel-open');
     $('open-panel').setAttribute('aria-pressed', 'true');
   }
   renderList();

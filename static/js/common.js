@@ -50,9 +50,36 @@
     return wrapped;
   };
 
+  // --- On-screen keyboard ---------------------------------------------------
+  // Where the browser does not resize the page for the keyboard (iOS), the visual
+  // viewport shrinks instead. Follow it so the editor never ends up behind the
+  // keyboard. `kb-open` lets the CSS drop the export bar while someone types.
+
+  S.coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+  const vv = window.visualViewport;
+  if (vv) {
+    const root = document.documentElement;
+    const follow = () => {
+      const squeezed = vv.scale <= 1.01 && window.innerHeight - vv.height > 80;
+      if (squeezed) {
+        root.style.setProperty('--app-h', `${Math.round(vv.height)}px`);
+        root.style.setProperty('--app-top', `${Math.round(vv.offsetTop)}px`);
+      } else {
+        root.style.removeProperty('--app-h');
+        root.style.removeProperty('--app-top');
+      }
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
+      root.classList.toggle('kb-open', S.coarsePointer && typing && vv.scale <= 1.01 && vv.height < screen.height * 0.72);
+    };
+    vv.addEventListener('resize', follow);
+    vv.addEventListener('scroll', follow);
+    document.addEventListener('focusin', follow);
+    document.addEventListener('focusout', () => setTimeout(follow, 50));
+  }
+
   // --- API ------------------------------------------------------------------
 
-  S.api = async function (method, url, body, extra) {
+  S.api =async function (method, url, body, extra) {
     const init = { method, ...extra };
     if (body !== undefined) {
       init.headers = { 'Content-Type': 'application/json' };
@@ -352,9 +379,10 @@
       if (!open) {
         content.classList.add('show');
         trigger.classList.add('active');
-        search.focus();
+        if (!S.coarsePointer) search.focus(); // on touch the keyboard would cover the list
         const sel = list.querySelector('.selected');
         if (sel) sel.scrollIntoView({ block: 'nearest' });
+        if (getComputedStyle(content).position === 'static') content.scrollIntoView({ block: 'nearest' }); // inline list on phones
       }
     });
     search.addEventListener('input', () => {
