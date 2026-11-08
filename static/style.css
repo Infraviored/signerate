@@ -30,7 +30,7 @@ body {
 }
 
 h1, h2, h3, p { margin: 0; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 button, .btn, a, label, select { touch-action: manipulation; }
 a { color: inherit; }
 
