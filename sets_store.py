@@ -582,11 +582,13 @@ def preview(raw_settings, texts, frozen=None):
 
 # --- Export ------------------------------------------------------------------
 
-def export_filename(name, scope, count, fmt, when=None):
-    when = when or datetime.now()
-    safe = name.replace(" ", "_")
-    kind = "New" if scope == "new" else "All"
-    return f"{safe}_{kind}_{count}-Signs_{when.strftime('%Y-%m-%d_%H-%M-%S')}.{fmt}"
+def export_filename(name, first_text, count, settings, fmt):
+    """<Set>-<first word of the first sign>[+<further signs>]-<W>x<H>mm.<ext>"""
+    words = first_text.split()
+    word = re.sub(r"[^\w-]", "", words[0]) if words else ""
+    more = f"+{count - 1}" if count > 1 else ""
+    size = f"{settings['width']:g}x{settings['height']:g}mm"
+    return f"{name.replace(' ', '_')}-{word or 'Sign'}{more}-{size}.{fmt}"
 
 
 def run_export(name, scope, fmt, output_path, generate, progress=None):
@@ -641,6 +643,6 @@ def run_export(name, scope, fmt, output_path, generate, progress=None):
 
     return {
         "count": len(selected),
-        "filename": export_filename(name, scope, len(selected), fmt),
+        "filename": export_filename(name, selected[0][1]["text"], len(selected), settings, fmt),
         "set": cur,
     }

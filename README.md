@@ -89,7 +89,7 @@ new. If `sets/` is empty, a "Workshop" Set is seeded.
 | `GET /api/progress`, `/api/last-export`, `/api/download?id=...` | export progress and download |
 
 Errors are JSON `{"error": "..."}` with a 4xx/5xx status. Export filenames look like
-`<Set>_New|All_<n>-Signs_<YYYY-MM-DD_HH-MM-SS>.<ext>`.
+`<Set>-<first word of the first sign>[+<further signs>]-<W>x<H>mm.<ext>`.
 
 ## Docker Deployment
 

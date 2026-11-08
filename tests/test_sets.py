@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 import pytest
 
@@ -182,7 +183,7 @@ def test_export_new_vs_all_in_list_order(store, tmp_path):
     res = export("T", "new", gen, tmp_path)
     assert gen.calls[0]["texts"] == ["d", "b"]
     assert res["count"] == 2
-    assert res["filename"].startswith("T_New_2-Signs_") and res["filename"].endswith(".3mf")
+    assert re.fullmatch(r"T-\w+\+1-[\d.]+x[\d.]+mm\.3mf", res["filename"])
 
     data = sets_store.read_set("T")
     assert all(s["exported_at"] for s in data["signs"])
@@ -194,7 +195,7 @@ def test_export_new_vs_all_in_list_order(store, tmp_path):
 
     res = export("T", "all", gen, tmp_path, fmt="step")
     assert gen.calls[-1]["texts"] == ["d", "c", "b", "a"]
-    assert res["filename"].startswith("T_All_4-Signs_") and res["filename"].endswith(".step")
+    assert re.fullmatch(r"T-\w+\+3-[\d.]+x[\d.]+mm\.step", res["filename"])
 
 
 def test_font_size_is_frozen_over_all_signs_at_first_export(store, tmp_path):
@@ -326,3 +327,10 @@ def test_http_export_and_download(store, monkeypatch, tmp_path):
 
     assert client.get("/api/sets/..%2Fx").status_code in (400, 404)
     assert client.put("/api/sets/Web", data="{bad", content_type="application/json").status_code == 400
+
+
+def test_export_filename():
+    st = {"width": 43.0, "height": 19.5}
+    assert sets_store.export_filename("Klingel", "Florian\nSchneider", 1, st, "3mf") == "Klingel-Florian-43x19.5mm.3mf"
+    assert sets_store.export_filename("My Set", "Bits, Bohrer", 3, st, "step") == "My_Set-Bits+2-43x19.5mm.step"
+    assert sets_store.export_filename("S", "...", 1, st, "3mf") == "S-Sign-43x19.5mm.3mf"
