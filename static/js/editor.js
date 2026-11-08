@@ -5,7 +5,7 @@
   const $ = (id) => document.getElementById(id);
 
   const SETTING_KEYS = ['width', 'height', 'min_margin', 'base_thickness', 'text_thickness',
-    'text_protrusion', 'bg_color', 'text_color', 'font_path', 'horizontal_align', 'text_size'];
+    'text_protrusion', 'bg_color', 'text_color', 'font_path', 'horizontal_align', 'text_size', 'frame_width'];
   const PANEL_KEY = 'signerate.panelOpen';
 
   const state = {
@@ -67,8 +67,9 @@
 
   function sameSettings(a, b) {
     return SETTING_KEYS.every((k) => {
-      const x = a[k] === undefined ? null : a[k];
-      const y = b[k] === undefined ? null : b[k];
+      const fallback = k === 'frame_width' ? 0 : null;
+      const x = a[k] === undefined ? fallback : a[k];
+      const y = b[k] === undefined ? fallback : b[k];
       return (typeof x === 'number' && typeof y === 'number')
         ? x === y
         : String(x).toLowerCase() === String(y).toLowerCase();

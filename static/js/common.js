@@ -120,14 +120,14 @@
 
   const LINE_PITCH = 1.2; // same as fonts.LINE_PITCH on the server
 
-  S.guessFontSize = (st) => (st.height - 2 * st.min_margin) * 0.7;
+  S.guessFontSize = (st) => (st.height - 2 * (st.min_margin + (st.frame_width || 0))) * 0.7;
 
   /* Pixels per millimetre so a plate fits inside maxW x maxH. */
   S.plateScale = (st, maxW, maxH) => Math.min(maxW / st.width, maxH / st.height);
 
   /* A sign as SVG in mm units, drawn at `scale` px/mm. fontSize null = rough guess. */
   S.signSvg = function (st, text, fontSize, scale) {
-    const w = st.width, h = st.height, m = st.min_margin;
+    const w = st.width, h = st.height, f = st.frame_width || 0, m = st.min_margin + f;
     const size = fontSize || S.guessFontSize(st);
     let x = w / 2, anchor = 'middle';
     if (st.horizontal_align === 'left') { x = m; anchor = 'start'; }
@@ -144,6 +144,7 @@
     });
     return S.svg('svg', { class: 'sign-svg', width: w * scale, height: h * scale, viewBox: `0 0 ${w} ${h}` },
       S.svg('rect', { x: 0, y: 0, width: w, height: h, fill: st.bg_color, rx: 0.8, ry: 0.8 }),
+      f > 0 ? S.svg('rect', { x: f / 2, y: f / 2, width: w - f, height: h - f, fill: 'none', stroke: st.text_color, 'stroke-width': f }) : null,
       ...labels);
   };
 
@@ -160,9 +161,11 @@
       if (!fin(s[k]) || s[k] <= 0) err[k] = 'Must be greater than 0.';
     }
     if (!fin(s.min_margin) || s.min_margin < 0) err.min_margin = 'Must be 0 or more.';
+    if (!fin(s.frame_width) || s.frame_width < 0) err.frame_width = 'Must be 0 or more.';
     if (!fin(s.text_protrusion)) err.text_protrusion = 'Must be a number.';
-    if (!err.min_margin && !err.width && !err.height && 2 * s.min_margin >= Math.min(s.width, s.height)) {
-      err.min_margin = 'Too large for the width/height.';
+    if (!err.min_margin && !err.frame_width && !err.width && !err.height
+        && 2 * (s.min_margin + s.frame_width) >= Math.min(s.width, s.height)) {
+      err.min_margin = 'Margin and frame are too large for this plate.';
     }
     if (!s.font_path) err.font_path = 'Choose a font.';
     if (s.text_size !== null && (!fin(s.text_size) || s.text_size <= 0)) err.text_size = 'Text size must be greater than 0.';
@@ -181,6 +184,7 @@
     ['height', 'Height (mm)', '', { min: 1, step: 0.5 }],
     ['base_thickness', 'Thickness (mm)', '', { min: 0.1, step: 0.2 }],
     ['min_margin', 'Margin (mm)', 'Kept free around the text.', { min: 0, step: 0.5 }],
+    ['frame_width', 'Frame (mm)', '0 is no frame. Uses the text colour.', { min: 0, step: 0.5 }],
     ['text_thickness', 'Text depth (mm)', 'How deep the letters go.', { min: 0.1, step: 0.2 }],
     ['text_protrusion', 'Raised by (mm)', '0 is flush with the plate.', { step: 0.1 }],
   ];
@@ -189,7 +193,7 @@
      onChange(settings, valid) fires on every edit. suggestSize() prefills a fixed text size. */
   S.SettingsForm = function (initial, onChange, suggestSize) {
     const inputs = {};
-    let current = { ...initial };
+    let current = { frame_width: 0, ...initial };
 
     const FIT_HINT = 'Fills the width or height. The longest sign sets the size for all.';
     const FIXED_HINT = 'A sign too long for this size shrinks to fit.';
@@ -248,6 +252,7 @@
       S.el('h3', { class: 'form-section', text: 'Plate' }),
       pair(numberField('width'), numberField('height')),
       pair(numberField('base_thickness'), numberField('min_margin')),
+      pair(numberField('frame_width')),
       S.el('h3', { class: 'form-section', text: 'Text' }),
       S.el('div', { class: 'field' }, label('Font'), picker.el),
       S.el('div', { class: 'field' }, label('Text size'),
@@ -290,8 +295,8 @@
       el,
       get: read,
       set(s) {
-        current = { ...s };
-        for (const [key] of FIELDS) inputs[key].value = s[key];
+        current = { frame_width: 0, ...s };
+        for (const [key] of FIELDS) inputs[key].value = current[key];
         colorBg.value = s.bg_color;
         colorText.value = s.text_color;
         align.value = s.horizontal_align;

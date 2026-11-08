@@ -32,7 +32,7 @@ MAX_SIGNS = 2000
 SETTING_KEYS = (
     "width", "height", "min_margin", "base_thickness", "text_thickness",
     "text_protrusion", "bg_color", "text_color", "font_path", "horizontal_align",
-    "text_size",
+    "text_size", "frame_width",
 )
 
 BUILTIN_DEFAULTS = {
@@ -47,6 +47,7 @@ BUILTIN_DEFAULTS = {
     "font_path": "",
     "horizontal_align": "center",
     "text_size": None,  # None = fit the plate; a number = fixed size in mm
+    "frame_width": 0.0,  # ring along the plate edge in the text colour; 0 = none
 }
 
 LOCK = threading.RLock()
@@ -170,6 +171,9 @@ def validate_settings(raw, base):
     s["text_protrusion"] = _number(s["text_protrusion"], "text_protrusion")
     if abs(s["text_protrusion"]) > 100:
         raise ApiError("text_protrusion is out of range.")
+    s["frame_width"] = _number(s["frame_width"], "frame_width")
+    if s["frame_width"] < 0:
+        raise ApiError("frame_width must not be negative.")
     for k in ("bg_color", "text_color"):
         if not isinstance(s[k], str) or not _COLOR_RE.fullmatch(s[k]):
             raise ApiError(f"{k} must be a color like #aabbcc.")
@@ -186,9 +190,14 @@ def validate_settings(raw, base):
     return s
 
 
+def text_inset(s):
+    """Distance from the plate edge to the area the text may use."""
+    return float(s["min_margin"]) + float(s.get("frame_width") or 0)
+
+
 def check_geometry(s):
-    if 2 * float(s["min_margin"]) >= min(float(s["width"]), float(s["height"])):
-        raise ApiError("min_margin is too large for the width/height.")
+    if 2 * text_inset(s) >= min(float(s["width"]), float(s["height"])):
+        raise ApiError("Margin and frame are too large for the width/height.")
 
 
 # --- Files -------------------------------------------------------------------
@@ -239,8 +248,8 @@ def _optimum_for(texts, settings):
     if not texts or not font_path or not os.path.exists(font_path):
         return None
     try:
-        aw = float(settings["width"]) - 2 * float(settings["min_margin"])
-        ah = float(settings["height"]) - 2 * float(settings["min_margin"])
+        aw = float(settings["width"]) - 2 * text_inset(settings)
+        ah = float(settings["height"]) - 2 * text_inset(settings)
         return fonts.plan_sizes(texts, font_path, aw, ah)["optimum"]
     except Exception as e:  # unreadable font etc.
         log(f"Could not compute font size during migration: {e}")
@@ -554,8 +563,8 @@ def preview(raw_settings, texts, frozen=None):
         raise ApiError("No font selected.")
     if not os.path.exists(font_path):
         raise ApiError(f"Font file not found: {font_path}")
-    aw = settings["width"] - 2 * settings["min_margin"]
-    ah = settings["height"] - 2 * settings["min_margin"]
+    aw = settings["width"] - 2 * text_inset(settings)
+    ah = settings["height"] - 2 * text_inset(settings)
     frozen = size_limit(settings, frozen)
     plan = fonts.plan_sizes(texts, font_path, aw, ah, frozen)
     r = lambda v: None if v is None else round(v, 3)
@@ -602,8 +611,8 @@ def run_export(name, scope, fmt, output_path, generate, progress=None):
     if not font_path or not os.path.exists(font_path):
         raise ApiError(f"Font file not found: {font_path or '(none selected)'}")
 
-    aw = settings["width"] - 2 * settings["min_margin"]
-    ah = settings["height"] - 2 * settings["min_margin"]
+    aw = settings["width"] - 2 * text_inset(settings)
+    ah = settings["height"] - 2 * text_inset(settings)
     # Sizes are planned over ALL signs so a partial export matches earlier prints.
     plan = fonts.plan_sizes(
         [s["text"] for s in signs], font_path, aw, ah, size_limit(settings, snap.get("font_size"))

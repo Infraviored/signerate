@@ -46,6 +46,18 @@ def _text_block(text: str, font_size: float, distance: float, font_path: str, al
     return cq.Workplane("XY").newObject([cq.Compound.makeCompound(shapes)])
 
 
+def _frame_ring(width, height, frame_w, depth, z, outer_extra=0.0):
+    """A rectangular ring along the plate edge, centred like the plate."""
+    return (
+        cq.Workplane("XY")
+        .rect(width + 2 * outer_extra, height + 2 * outer_extra)
+        .rect(width - 2 * frame_w, height - 2 * frame_w)
+        .extrude(depth)
+        .translate((0, 0, z))
+        .val()
+    )
+
+
 def _safe_name(text: str, max_len: int = 48) -> str:
     name = text.strip()
     name = re.sub(r'[<>:"/\\|?*\x00-\x1F&\']', "_", name)
@@ -96,7 +108,9 @@ def generate_signs(
     (planned by fonts.plan_sizes, the same function the preview uses)."""
     width = float(settings["width"])
     height = float(settings["height"])
-    min_margin = float(settings["min_margin"])
+    frame_w = float(settings.get("frame_width") or 0)
+    # The text keeps its margin from the inside of the frame.
+    min_margin = float(settings["min_margin"]) + frame_w
     base_h = float(settings["base_thickness"])
     text_h = float(settings["text_thickness"])
     font_path = settings["font_path"]
@@ -191,6 +205,10 @@ def generate_signs(
             .clean()
             .val()
         )
+        if frame_w > 0:
+            letters_shape = cq.Compound.makeCompound(
+                [letters_shape, _frame_ring(width, height, frame_w, text_h, text_z_bottom)]
+            )
 
         # 2. Generate Pocket
         # Pocket depth is only the part that is below the top surface
@@ -204,6 +222,12 @@ def generate_signs(
                 .clean()
                 .val()
             )
+            if frame_w > 0:
+                # 1 mm past the plate edge so the cut has no coincident outer faces
+                pocket_shape = cq.Compound.makeCompound([
+                    pocket_shape,
+                    _frame_ring(width, height, frame_w, pocket_depth + top_opening_overshoot, text_z_bottom, 1.0),
+                ])
 
             # 3. Cut Background
             base_solid = cq.Workplane("XY").box(width, height, base_h, centered=(True, True, False)).val()
