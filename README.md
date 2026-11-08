@@ -1,3 +1,5 @@
+<img src="static/logo.svg" alt="" width="64" height="64">
+
 # Signerate - Sign Generator
 
 Signerate is a small Flask app for generating 3D printable signs (3MF or STEP) with CadQuery.
