@@ -5,6 +5,9 @@
   const S = (window.Signerate = {});
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
+  // Back and forward can restore a frozen page; its data is only loaded on a real start.
+  window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
+
   // --- DOM helpers ----------------------------------------------------------
 
   function apply(node, props) {
