@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import fonts
+import outlines
 
 BASE_DIR = Path(__file__).resolve().parent
 SETS_DIR = Path(os.environ.get("SIGNERATE_SETS_DIR") or BASE_DIR / "sets")
@@ -32,7 +33,7 @@ MAX_SIGNS = 2000
 SETTING_KEYS = (
     "width", "height", "min_margin", "base_thickness", "text_thickness",
     "text_protrusion", "bg_color", "text_color", "font_path", "horizontal_align",
-    "text_size", "frame_width",
+    "text_size", "frame_width", "shape", "shape_params",
 )
 
 BUILTIN_DEFAULTS = {
@@ -48,6 +49,8 @@ BUILTIN_DEFAULTS = {
     "horizontal_align": "center",
     "text_size": None,  # None = fit the plate; a number = fixed size in mm
     "frame_width": 0.0,  # ring along the plate edge in the text colour; 0 = none
+    "shape": "rect",  # outer contour, see outlines.py
+    "shape_params": {},  # parameters of that shape; a missing key means automatic
 }
 
 LOCK = threading.RLock()
@@ -157,6 +160,7 @@ def validate_settings(raw, base):
     if not isinstance(raw, dict):
         raise ApiError("settings must be an object.")
     s = {k: base.get(k, BUILTIN_DEFAULTS[k]) for k in SETTING_KEYS}
+    s["shape_params"] = dict(s["shape_params"]) if isinstance(s["shape_params"], dict) else s["shape_params"]
     for k in SETTING_KEYS:
         if k in raw:
             s[k] = raw[k]
@@ -186,6 +190,12 @@ def validate_settings(raw, base):
         s["text_size"] = _number(s["text_size"], "text_size")
         if s["text_size"] <= 0 or s["text_size"] > 2000:
             raise ApiError("text_size must be greater than 0 (and at most 2000).")
+    if not isinstance(s["shape"], str) or s["shape"] not in outlines.SHAPES:
+        raise ApiError("Unknown shape.")
+    try:
+        s["shape_params"] = outlines.normalize_params(s["shape"], s["width"], s["height"], s["shape_params"])
+    except outlines.ShapeError as e:
+        raise ApiError(str(e))
     check_geometry(s)
     return s
 
@@ -198,6 +208,30 @@ def text_inset(s):
 def check_geometry(s):
     if 2 * text_inset(s) >= min(float(s["width"]), float(s["height"])):
         raise ApiError("Margin and frame are too large for the width/height.")
+    if s.get("shape", "rect") != "rect" and not fit_for(s).has_room():
+        raise ApiError("Margin and frame are too large for this shape.")
+
+
+def fit_for(s):
+    """The text fit for these settings (cached). The single source for preview and export."""
+    return outlines.make_fit(s.get("shape", "rect"), s["width"], s["height"],
+                             s.get("shape_params") or {}, text_inset(s))
+
+
+def plan_for(s, texts, frozen=None):
+    """fonts.plan_sizes for a Set's settings: the ONE call used by preview, export and migration."""
+    inset = text_inset(s)
+    return fonts.plan_sizes(texts, s["font_path"], float(s["width"]) - 2 * inset,
+                            float(s["height"]) - 2 * inset, frozen,
+                            fit=fit_for(s), align=s.get("horizontal_align", "center"))
+
+
+def outline_for(s):
+    """What the client needs to draw the contour (path, resolved parameters, ranges)."""
+    try:
+        return outlines.describe(s.get("shape", "rect"), float(s["width"]), float(s["height"]), s.get("shape_params"))
+    except outlines.ShapeError as e:
+        raise ApiError(str(e))
 
 
 # --- Files -------------------------------------------------------------------
@@ -248,9 +282,7 @@ def _optimum_for(texts, settings):
     if not texts or not font_path or not os.path.exists(font_path):
         return None
     try:
-        aw = float(settings["width"]) - 2 * text_inset(settings)
-        ah = float(settings["height"]) - 2 * text_inset(settings)
-        return fonts.plan_sizes(texts, font_path, aw, ah)["optimum"]
+        return plan_for(settings, texts)["optimum"]
     except Exception as e:  # unreadable font etc.
         log(f"Could not compute font size during migration: {e}")
         return None
@@ -387,6 +419,7 @@ def summarize(data):
         "name": data["name"],
         "updated_at": data["updated_at"],
         "settings": data["settings"],
+        "outline": outline_for(data["settings"]),
         "font_size": set_font_size(data),
         "sign_count": len(signs),
         "new_count": sum(1 for s in signs if not s.get("exported_at")),
@@ -548,6 +581,11 @@ def renew_all(name):
 
 # --- Preview -----------------------------------------------------------------
 
+def present(data):
+    """A Set as the client gets it: the stored data plus the outline to draw."""
+    return dict(data, outline=outline_for(data["settings"]))
+
+
 def preview(raw_settings, texts, frozen=None):
     settings = validate_settings(raw_settings or {}, default_settings())
     if not isinstance(texts, list) or not all(isinstance(t, str) for t in texts):
@@ -563,19 +601,18 @@ def preview(raw_settings, texts, frozen=None):
         raise ApiError("No font selected.")
     if not os.path.exists(font_path):
         raise ApiError(f"Font file not found: {font_path}")
-    aw = settings["width"] - 2 * text_inset(settings)
-    ah = settings["height"] - 2 * text_inset(settings)
     frozen = size_limit(settings, frozen)
-    plan = fonts.plan_sizes(texts, font_path, aw, ah, frozen)
+    plan = plan_for(settings, texts, frozen)
     r = lambda v: None if v is None else round(v, 3)
     return {
         "font_size": r(plan["set_size"]),
         "optimum": r(plan["optimum"]),
         "limiting_text": plan["limiting_text"],
         "locked": frozen is not None,
+        "outline": outline_for(settings),
         "signs": [
-            {"text": t.strip(), "font_size": r(sz), "shrunk": sh}
-            for t, sz, sh in zip(texts, plan["sizes"], plan["shrunk"])
+            {"text": t.strip(), "font_size": r(sz), "shrunk": sh, "x": r(x)}
+            for t, sz, sh, x in zip(texts, plan["sizes"], plan["shrunk"], plan["anchors"])
         ],
     }
 
@@ -613,12 +650,8 @@ def run_export(name, scope, fmt, output_path, generate, progress=None, deliver=N
     if not font_path or not os.path.exists(font_path):
         raise ApiError(f"Font file not found: {font_path or '(none selected)'}")
 
-    aw = settings["width"] - 2 * text_inset(settings)
-    ah = settings["height"] - 2 * text_inset(settings)
     # Sizes are planned over ALL signs so a partial export matches earlier prints.
-    plan = fonts.plan_sizes(
-        [s["text"] for s in signs], font_path, aw, ah, size_limit(settings, snap.get("font_size"))
-    )
+    plan = plan_for(settings, [s["text"] for s in signs], size_limit(settings, snap.get("font_size")))
 
     texts = [s["text"] for _, s in selected]
     sizes = [plan["sizes"][i] for i, _ in selected]

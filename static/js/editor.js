@@ -5,7 +5,8 @@
   const $ = (id) => document.getElementById(id);
 
   const SETTING_KEYS = ['width', 'height', 'min_margin', 'base_thickness', 'text_thickness',
-    'text_protrusion', 'bg_color', 'text_color', 'font_path', 'horizontal_align', 'text_size', 'frame_width'];
+    'text_protrusion', 'bg_color', 'text_color', 'font_path', 'horizontal_align', 'text_size', 'frame_width',
+    'shape', 'shape_params'];
   const PANEL_KEY = 'signerate.panelOpen';
   const DEST_KEY = 'signerate.destination';
   const STACK_BELOW = 760; // workspace width in px; keep in step with the @container rule in style.css
@@ -22,6 +23,7 @@
     lastExport: null,    // {token, filename, set, count}
     preview: null,       // last answer of /api/preview
     previewError: '',
+    outline: null,       // contour to draw; only the server defines shapes
   };
   let set = null;
   let scale = 1;
@@ -51,6 +53,11 @@
     S.toast('Could not load the font list: ' + e.message, { type: 'error' });
   }
   try {
+    await S.loadShapes();
+  } catch (e) {
+    S.toast('Could not load the shape list: ' + e.message, { type: 'error' });
+  }
+  try {
     set = await S.api('GET', S.setUrl(state.name));
   } catch (e) {
     document.body.replaceChildren(S.el('p', { class: 'empty-state', text: 'Could not load this set: ' + e.message }));
@@ -58,7 +65,9 @@
   }
   $('close-panel').append(S.icon(S.ICON_CLOSE));
 
+  state.outline = set.outline;
   const form = S.SettingsForm(set.settings, onSettingsChange, () => state.preview && state.preview.font_size);
+  form.setOutline(set.outline);
   $('panel-form').append(form.el);
 
   // --- Helpers --------------------------------------------------------------
@@ -72,11 +81,17 @@
   const scopeCount = () => (state.scope === 'new' ? newSigns().length : set.signs.length);
   const plural = (n) => `${n} ${n === 1 ? 'sign' : 'signs'}`;
 
+  function sameParams(x, y) {
+    const keys = new Set([...Object.keys(x || {}), ...Object.keys(y || {})]);
+    return [...keys].every((k) => ((x || {})[k] ?? null) === ((y || {})[k] ?? null));
+  }
+
   function sameSettings(a, b) {
     return SETTING_KEYS.every((k) => {
-      const fallback = k === 'frame_width' ? 0 : null;
+      const fallback = { frame_width: 0, shape: 'rect', shape_params: {} }[k] ?? null;
       const x = a[k] === undefined ? fallback : a[k];
       const y = b[k] === undefined ? fallback : b[k];
+      if (k === 'shape_params') return sameParams(x, y);
       return (typeof x === 'number' && typeof y === 'number')
         ? x === y
         : String(x).toLowerCase() === String(y).toLowerCase();
@@ -128,6 +143,7 @@
       updateChrome();
     } catch (e) {
       state.dirty = true;
+      if (e.status === 400) form.setError(e.message);
       setSaveState('error', 'Not saved: ' + e.message + ' Click to retry.');
       if (!e.status || e.status >= 500) {
         clearTimeout(retryTimer);
@@ -180,16 +196,20 @@
       if (mine !== previewSeq) return;
       state.preview = { ...res, ids };
       state.previewError = '';
+      state.outline = res.outline;
+      form.setOutline(res.outline);
+      if (!state.formInvalid) form.setError('');
     } catch (e) {
       if (mine !== previewSeq) return;
       state.previewError = e.message;
+      if (e.status === 400) form.setError(e.message);
     }
     applyPreview();
   }
   const schedulePreview = S.debounce(runPreview, 120);
 
   function drawRow(r) {
-    r.box.replaceChildren(S.signSvg(set.settings, r.sign.text, r.size, scale));
+    r.box.replaceChildren(S.signSvg(set.settings, r.sign.text, r.size, scale, { outline: state.outline, x: r.x }));
   }
 
   function applyPreview() {
@@ -206,6 +226,7 @@
         if (!r) return;
         r.size = p.signs[i].font_size;
         r.shrunk = p.signs[i].shrunk;
+        r.x = p.signs[i].x;
       });
     }
     for (const r of rows.values()) {
@@ -213,7 +234,7 @@
       drawRow(r);
       renderNote(r);
     }
-    $('add-preview').replaceChildren(S.signSvg(st, '', null, scale));
+    $('add-preview').replaceChildren(S.signSvg(st, '', null, scale, { outline: state.outline }));
     renderStats();
   }
 

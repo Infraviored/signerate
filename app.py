@@ -10,6 +10,7 @@ from werkzeug.exceptions import HTTPException
 
 import fonts
 import nextcloud
+import outlines
 import sets_store
 from sets_store import ApiError
 
@@ -25,8 +26,11 @@ MIMETYPES = {"3mf": "model/3mf", "step": "application/step"}
 
 def generate_signs(texts, font_sizes, settings, path, fmt, progress):
     """Geometry entry point; imported lazily so CadQuery loads only when exporting."""
-    from generator import generate_signs as _generate
-    return _generate(texts, font_sizes, settings, path, export_type=fmt, progress_callback=progress)
+    from generator import FrameError, generate_signs as _generate
+    try:
+        return _generate(texts, font_sizes, settings, path, export_type=fmt, progress_callback=progress)
+    except FrameError as e:
+        raise ApiError(str(e))
 
 
 def log_error(e):
@@ -94,6 +98,12 @@ def api_defaults():
     return jsonify(sets_store.default_settings())
 
 
+@app.route("/api/shapes")
+def api_shapes():
+    """Shape catalog for the picker: ids, names, parameters and a thumbnail path each."""
+    return jsonify(outlines.catalog())
+
+
 # --- Sets --------------------------------------------------------------------
 
 @app.route("/api/sets", methods=["GET"])
@@ -103,17 +113,17 @@ def api_list_sets():
 
 @app.route("/api/sets", methods=["POST"])
 def api_create_set():
-    return jsonify(sets_store.create_set(json_body())), 201
+    return jsonify(sets_store.present(sets_store.create_set(json_body()))), 201
 
 
 @app.route("/api/sets/<name>", methods=["GET"])
 def api_get_set(name):
-    return jsonify(sets_store.read_set(name))
+    return jsonify(sets_store.present(sets_store.read_set(name)))
 
 
 @app.route("/api/sets/<name>", methods=["PUT"])
 def api_update_set(name):
-    return jsonify(sets_store.update_set(name, json_body()))
+    return jsonify(sets_store.present(sets_store.update_set(name, json_body())))
 
 
 @app.route("/api/sets/<name>", methods=["DELETE"])
@@ -127,17 +137,17 @@ def api_rename_set(name):
     data = sets_store.rename_set(name, json_body().get("name"))
     if LAST_EXPORT and LAST_EXPORT["set"] == name:
         LAST_EXPORT["set"] = data["name"]
-    return jsonify(data)
+    return jsonify(sets_store.present(data))
 
 
 @app.route("/api/sets/<name>/renew-all", methods=["POST"])
 def api_renew_all(name):
-    return jsonify(sets_store.renew_all(name))
+    return jsonify(sets_store.present(sets_store.renew_all(name)))
 
 
 @app.route("/api/sets/<name>/signs/<sign_id>/renew", methods=["POST"])
 def api_renew_sign(name, sign_id):
-    return jsonify(sets_store.renew_sign(name, sign_id))
+    return jsonify(sets_store.present(sets_store.renew_sign(name, sign_id)))
 
 
 # --- Preview -----------------------------------------------------------------

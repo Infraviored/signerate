@@ -18,6 +18,11 @@
   } catch (e) {
     S.toast('Could not load the font list: ' + e.message, { type: 'error' });
   }
+  try {
+    await S.loadShapes();
+  } catch (e) {
+    S.toast('Could not load the shape list: ' + e.message, { type: 'error' });
+  }
 
   // --- Overview -------------------------------------------------------------
 
@@ -32,9 +37,9 @@
     const scale = shelfScale(st);
     const plates = S.el('div', { class: 'shelf-signs' });
     if (set.previews.length) {
-      for (const p of set.previews) plates.append(S.signSvg(st, p.text, p.font_size, scale));
+      for (const p of set.previews) plates.append(S.signSvg(st, p.text, p.font_size, scale, { outline: set.outline, x: p.x }));
     } else {
-      plates.append(S.signSvg(st, '', null, scale));
+      plates.append(S.signSvg(st, '', null, scale, { outline: set.outline }));
     }
     return S.el('section', { class: 'shelf' },
       S.el('div', { class: 'shelf-head' },
@@ -65,6 +70,7 @@
     try {
       const res = await S.preview(set.settings, texts, set.font_size);
       set.previews = res.signs;
+      set.outline = res.outline;
     } catch (e) { /* keep the set's own size */ }
   }
 
@@ -121,7 +127,8 @@
     const first = set && set.previews[0];
     return S.el('label', { class: 'wizard-option' }, radio,
       S.el('span', { class: 'option-text' }, title, S.el('small', { text: sub })),
-      set ? S.signSvg(set.settings, first ? first.text : '', first ? first.font_size : null, S.plateScale(set.settings, 150, 44)) : null);
+      set ? S.signSvg(set.settings, first ? first.text : '', first ? first.font_size : null, S.plateScale(set.settings, 150, 44),
+        { outline: set.outline, x: first ? first.x : undefined }) : null);
   }
 
   function openWizard(preselect) {
@@ -149,8 +156,12 @@
     if (Object.keys(S.checkSettings(st)).length) return;
     try {
       const res = await S.preview(st, ['Sample']);
-      $('wizard-preview').replaceChildren(S.signSvg(st, 'Sample', res.font_size, S.plateScale(st, 420, 100)));
+      form.setOutline(res.outline);
+      form.setError('');
+      $('wizard-preview').replaceChildren(S.signSvg(st, 'Sample', res.font_size, S.plateScale(st, 420, 100),
+        { outline: res.outline, x: res.signs[0].x }));
     } catch (e) {
+      if (e.status === 400) form.setError(e.message);
       $('wizard-preview').replaceChildren(S.el('span', { class: 'muted', text: e.message }));
     }
   }, 200);

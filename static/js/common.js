@@ -143,6 +143,13 @@
     return (path || '').split('/').pop().replace(/\.[^.]+$/, '') || 'No font';
   };
 
+  // --- Shapes ---------------------------------------------------------------
+
+  S.shapes = [];
+  S.loadShapes = async function () {
+    if (!S.shapes.length) S.shapes = await S.api('GET', '/api/shapes');
+  };
+
   // --- Sign preview ---------------------------------------------------------
 
   const LINE_PITCH = 1.2; // same as fonts.LINE_PITCH on the server
@@ -152,13 +159,22 @@
   /* Pixels per millimetre so a plate fits inside maxW x maxH. */
   S.plateScale = (st, maxW, maxH) => Math.min(maxW / st.width, maxH / st.height);
 
-  /* A sign as SVG in mm units, drawn at `scale` px/mm. fontSize null = rough guess. */
-  S.signSvg = function (st, text, fontSize, scale) {
+  let clipSeq = 0;
+
+  /* A sign as SVG in mm units, drawn at `scale` px/mm. fontSize null = rough guess.
+     geo (optional, from the server): {outline, x}. outline = {path, w, h} is the contour
+     (path null = plain rectangle); x = where the aligned text edge sits, plate-centred.
+     The shapes themselves are defined server-side only (outlines.py). An outline made for
+     other dimensions is stretched to fit, so a size edit never flashes a wrong shape. */
+  S.signSvg = function (st, text, fontSize, scale, geo) {
+    geo = geo || {};
+    const outline = st.shape && st.shape !== 'rect' && geo.outline && geo.outline.path ? geo.outline : null;
     const w = st.width, h = st.height, f = st.frame_width || 0, m = st.min_margin + f;
     const size = fontSize || S.guessFontSize(st);
     let x = w / 2, anchor = 'middle';
     if (st.horizontal_align === 'left') { x = m; anchor = 'start'; }
     else if (st.horizontal_align === 'right') { x = w - m; anchor = 'end'; }
+    if (typeof geo.x === 'number' && anchor !== 'middle') x = w / 2 + geo.x;
     const lines = String(text).split('\n');
     const labels = lines.map((line, n) => {
       const label = S.svg('text', {
@@ -169,10 +185,24 @@
       label.textContent = line;
       return label;
     });
-    return S.svg('svg', { class: 'sign-svg', width: w * scale, height: h * scale, viewBox: `0 0 ${w} ${h}` },
-      S.svg('rect', { x: 0, y: 0, width: w, height: h, fill: st.bg_color, rx: 0.8, ry: 0.8 }),
-      f > 0 ? S.svg('rect', { x: f / 2, y: f / 2, width: w - f, height: h - f, fill: 'none', stroke: st.text_color, 'stroke-width': f }) : null,
-      ...labels);
+    let body;
+    if (outline) {
+      const id = 'plate-clip-' + (++clipSeq);
+      const sx = w / outline.w, sy = h / outline.h;
+      const stretch = Math.abs(sx - 1) > 1e-9 || Math.abs(sy - 1) > 1e-9 ? { transform: `scale(${sx} ${sy})` } : {};
+      // The frame is a stroke of twice its width, clipped to the contour: the inner edge is
+      // the contour moved in by exactly the frame width.
+      body = [S.svg('g', stretch,
+        S.svg('path', { d: outline.path, fill: st.bg_color }),
+        f > 0 ? S.svg('clipPath', { id }, S.svg('path', { d: outline.path })) : null,
+        f > 0 ? S.svg('path', { d: outline.path, fill: 'none', stroke: st.text_color, 'stroke-width': 2 * f, 'clip-path': `url(#${id})` }) : null)];
+    } else {
+      body = [
+        S.svg('rect', { x: 0, y: 0, width: w, height: h, fill: st.bg_color, rx: 0.8, ry: 0.8 }),
+        f > 0 ? S.svg('rect', { x: f / 2, y: f / 2, width: w - f, height: h - f, fill: 'none', stroke: st.text_color, 'stroke-width': f }) : null,
+      ];
+    }
+    return S.svg('svg', { class: 'sign-svg', width: w * scale, height: h * scale, viewBox: `0 0 ${w} ${h}` }, ...body, ...labels);
   };
 
   S.preview = (settings, texts, fontSize) =>
@@ -196,6 +226,10 @@
     }
     if (!s.font_path) err.font_path = 'Choose a font.';
     if (s.text_size !== null && (!fin(s.text_size) || s.text_size <= 0)) err.text_size = 'Text size must be greater than 0.';
+    // Ranges depend on the plate and the shape, so the server has the last word (shown in the same error line).
+    for (const [key, v] of Object.entries(s.shape_params || {})) {
+      if (!fin(v) || v < 0) err['shape_' + key] = 'Shape values must be 0 or more.';
+    }
     return err;
   };
 
@@ -220,7 +254,10 @@
      onChange(settings, valid) fires on every edit. suggestSize() prefills a fixed text size. */
   S.SettingsForm = function (initial, onChange, suggestSize) {
     const inputs = {};
-    let current = { frame_width: 0, ...initial };
+    const DEFAULTS = { frame_width: 0, shape: 'rect', shape_params: {} };
+    let current = { ...DEFAULTS, ...initial };
+    let outline = null; // newest outline from the server: its automatic values are the placeholders
+    const shapeInputs = {};
 
     const FIT_HINT = 'Fills the width or height. The longest sign sets the size for all.';
     const FIXED_HINT = 'A sign too long for this size shrinks to fit.';
@@ -275,11 +312,59 @@
 
     const pair = (...children) => S.el('div', { class: 'field-pair' }, ...children);
 
+    // Shape picker: thumbnails drawn from the server's outlines, then only the fields of the chosen shape.
+    const shapePicker = S.el('div', { class: 'shape-picker', attrs: { role: 'radiogroup', 'aria-label': 'Shape' } });
+    const shapeButtons = new Map();
+    for (const sh of S.shapes) {
+      const art = sh.path ? S.svg('path', { d: sh.path }) : S.svg('rect', { width: 300, height: 120 });
+      const btn = S.el('button', { type: 'button', class: 'shape-option', dataset: { shape: sh.id },
+        attrs: { role: 'radio', 'aria-checked': 'false' }, on: { click: () => pickShape(sh.id) } },
+        S.svg('svg', { viewBox: '-4 -4 308 128', 'aria-hidden': 'true' }, art),
+        S.el('span', { text: sh.name }));
+      shapeButtons.set(sh.id, btn);
+      shapePicker.append(btn);
+    }
+    const shapeFields = S.el('div', { class: 'shape-fields' });
+    const shapeHint = S.el('div', { class: 'field-hint', text: 'Leave a field empty for the automatic value.' });
+    const shapeInfo = (id) => S.shapes.find((sh) => sh.id === id) || { params: [] };
+    const autoText = (key) => {
+      const p = outline && outline.shape === current.shape && outline.params[key];
+      return p ? S.num(p.auto) : 'Auto';
+    };
+
+    function renderShape() {
+      for (const [id, btn] of shapeButtons) {
+        btn.classList.toggle('active', id === current.shape);
+        btn.setAttribute('aria-checked', String(id === current.shape));
+      }
+      for (const k of Object.keys(shapeInputs)) delete shapeInputs[k];
+      const params = shapeInfo(current.shape).params;
+      const fields = params.map((p) => {
+        const given = (current.shape_params || {})[p.key];
+        const input = S.el('input', { type: 'number', id: 'f-shape_' + p.key, value: given === undefined || given === null ? '' : given,
+          placeholder: autoText(p.key), attrs: { min: 0, step: p.unit ? 0.5 : 0.1 } });
+        input.addEventListener('input', changed);
+        shapeInputs[p.key] = input;
+        return S.el('div', { class: 'field' }, label(p.unit ? `${p.label} (${p.unit})` : p.label, 'f-shape_' + p.key), input);
+      });
+      shapeFields.replaceChildren(...fields);
+      shapeHint.hidden = !params.length;
+    }
+
+    function pickShape(id) {
+      if (id === current.shape) return;
+      current = { ...current, shape: id, shape_params: {} };
+      renderShape();
+      changed();
+    }
+
     const el = S.el('div', { class: 'settings-form' },
       S.el('h3', { class: 'form-section', text: 'Plate' }),
       pair(numberField('width'), numberField('height')),
       pair(numberField('base_thickness'), numberField('min_margin')),
       pair(numberField('frame_width')),
+      S.el('h3', { class: 'form-section', text: 'Shape' }),
+      shapePicker, shapeFields, shapeHint,
       S.el('h3', { class: 'form-section', text: 'Text' }),
       S.el('div', { class: 'field' }, label('Font'), picker.el),
       S.el('div', { class: 'field' }, label('Text size'),
@@ -295,6 +380,7 @@
       errorLine);
 
     showSize(current.text_size);
+    renderShape();
 
     function read() {
       const s = { ...current };
@@ -302,6 +388,11 @@
       s.bg_color = colorBg.value;
       s.text_color = colorText.value;
       s.horizontal_align = align.value;
+      s.shape = current.shape;
+      s.shape_params = {};
+      for (const [key, input] of Object.entries(shapeInputs)) {
+        if (input.value !== '') s.shape_params[key] = parseFloat(input.value);
+      }
       s.text_size = sizeFixed.classList.contains('active')
         ? (sizeInput.value === '' ? NaN : parseFloat(sizeInput.value))
         : null;
@@ -313,6 +404,7 @@
       const errors = S.checkSettings(s);
       for (const [key] of FIELDS) inputs[key].classList.toggle('invalid', !!errors[key]);
       sizeInput.classList.toggle('invalid', !!errors.text_size);
+      for (const [key, input] of Object.entries(shapeInputs)) input.classList.toggle('invalid', !!errors['shape_' + key]);
       errorLine.textContent = Object.values(errors)[0] || '';
       current = { ...current, ...s };
       onChange(s, Object.keys(errors).length === 0);
@@ -321,8 +413,18 @@
     return {
       el,
       get: read,
+      /* The server's outline for the current settings: fills the placeholders with the automatic values. */
+      setOutline(o) {
+        outline = o;
+        for (const [key, input] of Object.entries(shapeInputs)) input.placeholder = autoText(key);
+      },
+      /* A message from the server about these settings (e.g. a value out of range for this plate). */
+      setError(message) {
+        errorLine.textContent = message || Object.values(S.checkSettings(read()))[0] || '';
+      },
       set(s) {
-        current = { frame_width: 0, ...s };
+        current = { ...DEFAULTS, ...s };
+        renderShape();
         for (const [key] of FIELDS) inputs[key].value = current[key];
         colorBg.value = s.bg_color;
         colorText.value = s.text_color;

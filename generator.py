@@ -5,7 +5,13 @@ from typing import List, Tuple, Callable
 import cadquery as cq
 from cadquery import Color, Location, Vector
 from exporter_3mf import save_3mf
+import fonts
+import outlines
 from fonts import LINE_PITCH
+
+
+class FrameError(ValueError):
+    """The frame cannot follow this contour at the chosen width."""
 
 
 def hex_to_hex(hex_color: str) -> str:
@@ -56,6 +62,45 @@ def _frame_ring(width, height, frame_w, depth, z, outer_extra=0.0):
         .translate((0, 0, z))
         .val()
     )
+
+
+def _prism(face, depth, z=0.0):
+    """A face (in the XY plane) extruded upwards by `depth`, starting at height z."""
+    return cq.Solid.extrudeLinear(face, Vector(0, 0, depth)).translate(Vector(0, 0, z))
+
+
+def _outer_face(pts):
+    return cq.Face.makeFromWires(cq.Wire.makePolygon([Vector(x, y, 0) for x, y in pts], close=True))
+
+
+def _inner_face(pts, frame_w):
+    """The contour moved inwards by frame_w (constant width, also at concave corners,
+    tips and notches). Raises ValueError when the frame is too wide for the shape."""
+    wire = cq.Wire.makePolygon([Vector(x, y, 0) for x, y in pts], close=True)
+    outer_area = cq.Face.makeFromWires(wire).Area()
+    for d in (-frame_w, frame_w):  # which sign points inwards depends on the wire's orientation
+        try:
+            result = wire.offset2D(d, "intersection")
+        except Exception:
+            continue
+        if len(result) != 1:
+            continue
+        face = cq.Face.makeFromWires(result[0])
+        if 0 < face.Area() < outer_area and face.isValid():
+            return face
+    raise FrameError("The frame is too wide for this shape. Reduce the frame width.")
+
+
+def _contour_ring(outer_face, inner_face, depth, z):
+    """The frame for a non-rectangular plate: contour minus its inward offset."""
+    return _prism(outer_face, depth, z).cut(_prism(inner_face, depth, z)).clean()
+
+
+def _outside_of(inner_face, bbox, depth, z):
+    """Everything around the inner contour out to a box 1 mm beyond the plate; for the pocket cut."""
+    w, h = bbox
+    big = cq.Workplane("XY").rect(w + 2.0, h + 2.0).extrude(depth).translate((0, 0, z)).val()
+    return big.cut(_prism(inner_face, depth, z)).clean()
 
 
 def _safe_name(text: str, max_len: int = 48) -> str:
@@ -123,6 +168,16 @@ def generate_signs(
 
     available_w = width - 2 * min_margin
     available_h = height - 2 * min_margin
+    shape = settings.get("shape") or "rect"
+    shape_params = settings.get("shape_params") or {}
+    # Rectangles keep the exact old box code; every other shape extrudes its sampled contour.
+    contour = None if shape == "rect" else outlines.polygon(shape, width, height, shape_params)
+    fit = outlines.make_fit(shape, width, height, shape_params, min_margin)
+    outer_face = inner_face = None
+    if contour is not None:
+        outer_face = _outer_face(contour)
+        if frame_w > 0:
+            inner_face = _inner_face(contour, frame_w)
 
     if available_w <= 0 or available_h <= 0:
         raise ValueError("Width/Height too small relative to margin.")
@@ -153,6 +208,11 @@ def generate_signs(
     # Für STEP-Export (Assembly)
     assy = cq.Assembly(name="Signs")
 
+    def plate_solid():
+        if contour is None:
+            return cq.Workplane("XY").box(width, height, base_h, centered=(True, True, False)).val()
+        return _prism(outer_face, base_h)
+
     for i, (text, font_size) in enumerate(pairs):
         if progress_callback:
             progress_callback(i, len(clean_texts))
@@ -182,15 +242,12 @@ def generate_signs(
         # Calculate Offsets
         # Center horizontally vs left/right
         h_offset = 0
-        if text_align == "left":
-            # (bb.xmin+bb.xmax)/2 is where the center IS currently.
-            # We want bb.xmin to be at -available_w / 2
-            available_w = width - 2 * min_margin
-            h_offset = (-available_w / 2) - bb.xmin
-        elif text_align == "right":
-            # We want bb.xmax to be at available_w / 2
-            available_w = width - 2 * min_margin
-            h_offset = (available_w / 2) - bb.xmax
+        if text_align in ("left", "right"):
+            # The aligned edge goes to the furthest position that keeps the margin from the
+            # contour. fonts.text_anchor is the same function the preview uses; for a
+            # rectangle it is +-(width / 2 - margin).
+            anchor = fonts.text_anchor(text, font_size, font_path, fit, text_align)
+            h_offset = anchor - (bb.xmin if text_align == "left" else bb.xmax)
         else:
             # Geometric center horizontally
             h_offset = - (bb.xmin + bb.xmax) / 2
@@ -206,9 +263,9 @@ def generate_signs(
             .val()
         )
         if frame_w > 0:
-            letters_shape = cq.Compound.makeCompound(
-                [letters_shape, _frame_ring(width, height, frame_w, text_h, text_z_bottom)]
-            )
+            ring = (_frame_ring(width, height, frame_w, text_h, text_z_bottom) if contour is None
+                    else _contour_ring(outer_face, inner_face, text_h, text_z_bottom))
+            letters_shape = cq.Compound.makeCompound([letters_shape, ring])
 
         # 2. Generate Pocket
         # Pocket depth is only the part that is below the top surface
@@ -224,17 +281,17 @@ def generate_signs(
             )
             if frame_w > 0:
                 # 1 mm past the plate edge so the cut has no coincident outer faces
-                pocket_shape = cq.Compound.makeCompound([
-                    pocket_shape,
-                    _frame_ring(width, height, frame_w, pocket_depth + top_opening_overshoot, text_z_bottom, 1.0),
-                ])
+                depth = pocket_depth + top_opening_overshoot
+                pocket_ring = (_frame_ring(width, height, frame_w, depth, text_z_bottom, 1.0) if contour is None
+                               else _outside_of(inner_face, (width, height), depth, text_z_bottom))
+                pocket_shape = cq.Compound.makeCompound([pocket_shape, pocket_ring])
 
             # 3. Cut Background
-            base_solid = cq.Workplane("XY").box(width, height, base_h, centered=(True, True, False)).val()
+            base_solid = plate_solid()
             base_cut_shape = base_solid.cut(pocket_shape, tol=pocket_tol).clean()
         else:
             # If text is floating entirely above (protrusion > text_h), no pocket needed
-            base_cut_shape = cq.Workplane("XY").box(width, height, base_h, centered=(True, True, False)).val()
+            base_cut_shape = plate_solid()
 
         if export_type.lower() == "3mf":
             # Hierarchical structure for 3MF
