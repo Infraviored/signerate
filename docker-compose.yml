@@ -12,7 +12,7 @@ services:
       - ./static:/app/static
       - /usr/share/fonts:/usr/share/fonts:ro
     ports:
-      - "15000:15000"
+      - "127.0.0.1:15000:15000" # only the Doorman login service may reach it
     env_file:
       - path: .env
         required: false
