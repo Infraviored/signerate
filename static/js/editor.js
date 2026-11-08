@@ -7,11 +7,13 @@
   const SETTING_KEYS = ['width', 'height', 'min_margin', 'base_thickness', 'text_thickness',
     'text_protrusion', 'bg_color', 'text_color', 'font_path', 'horizontal_align', 'text_size', 'frame_width'];
   const PANEL_KEY = 'signerate.panelOpen';
+  const DEST_KEY = 'signerate.destination';
 
   const state = {
     name: $('editor').dataset.setName,
     scope: 'new',        // "New" every time the page loads
     format: '3mf',
+    destination: 'download',
     dirty: false,
     formInvalid: false,
     busy: false,         // an export is running
@@ -533,6 +535,7 @@
     btnNew.classList.toggle('active', state.scope === 'new');
     btnAll.classList.toggle('active', state.scope === 'all');
     for (const b of $('format').children) b.classList.toggle('active', b.dataset.format === state.format);
+    for (const b of $('destination').children) b.classList.toggle('active', b.dataset.destination === state.destination);
     const count = scopeCount();
     exportBtn.textContent = state.busy ? 'Exporting'
       : count ? `Export ${plural(count)}`
@@ -550,6 +553,14 @@
   for (const btn of $('format').children) {
     btn.addEventListener('click', () => {
       state.format = btn.dataset.format;
+      updateExportBar();
+    });
+  }
+
+  for (const btn of $('destination').children) {
+    btn.addEventListener('click', () => {
+      state.destination = btn.dataset.destination;
+      try { localStorage.setItem(DEST_KEY, state.destination); } catch (e) { /* private mode */ }
       updateExportBar();
     });
   }
@@ -601,12 +612,16 @@
           }
         } catch (e) { /* the export request reports real errors */ }
       }, 500);
-      const res = await S.api('POST', `${S.setUrl(state.name)}/export`, { scope: state.scope, format: state.format });
+      const res = await S.api('POST', `${S.setUrl(state.name)}/export`, { scope: state.scope, format: state.format, destination: state.destination });
       bar.style.width = '100%';
       mergeServerMeta(res.set);
       state.lastExport = { token: res.token, filename: res.filename, set: state.name, count: res.count };
-      showStatus('success', `Exported ${plural(res.count)}.`, state.lastExport);
-      startDownload(res.token);
+      if (state.destination === 'nextcloud') {
+        showStatus('success', `Saved ${plural(res.count)} to Nextcloud.`, state.lastExport);
+      } else {
+        showStatus('success', `Exported ${plural(res.count)}.`, state.lastExport);
+        startDownload(res.token);
+      }
       renderList();
       schedulePreview();
     } catch (e) {
@@ -632,6 +647,16 @@
   renderList();
   runPreview();
   setSaveState('');
+
+  try {
+    const targets = await S.api('GET', '/api/export-targets');
+    if (targets.nextcloud) {
+      $('destination').hidden = false;
+      $('destination').title = `Nextcloud saves to ${targets.folder}`;
+      try { if (localStorage.getItem(DEST_KEY) === 'nextcloud') state.destination = 'nextcloud'; } catch (e) { /* private mode */ }
+      updateExportBar();
+    }
+  } catch (e) { /* Download still works */ }
 
   try {
     const last = await S.api('GET', '/api/last-export');

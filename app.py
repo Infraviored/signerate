@@ -9,6 +9,7 @@ from flask import Flask, abort, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
 
 import fonts
+import nextcloud
 import sets_store
 from sets_store import ApiError
 
@@ -157,6 +158,11 @@ def api_export(name):
     data = json_body()
     scope = data.get("scope", "new")
     fmt = str(data.get("format", "3mf")).lower()
+    destination = data.get("destination", "download")
+    if destination not in ("download", "nextcloud"):
+        raise ApiError("destination must be 'download' or 'nextcloud'.")
+    if destination == "nextcloud" and not nextcloud.is_configured():
+        raise ApiError("Nextcloud is not configured on this server.")
     if not EXPORT_LOCK.acquire(blocking=False):
         raise ApiError("Another export is running. Try again in a moment.", 409)
     path = None
@@ -168,7 +174,14 @@ def api_export(name):
             PROGRESS.update(current=curr + 1, total=total, active=True)
 
         PROGRESS.update(current=0, total=0, active=True)
-        result = sets_store.run_export(name, scope, fmt, path, generate_signs, on_progress)
+        def to_nextcloud(file_path, filename):
+            try:
+                return nextcloud.upload(file_path, filename)
+            except nextcloud.UploadError as e:
+                raise ApiError(str(e), 502)
+
+        deliver = to_nextcloud if destination == "nextcloud" else None
+        result = sets_store.run_export(name, scope, fmt, path, generate_signs, on_progress, deliver)
         PROGRESS.update(current=result["count"], total=result["count"])
 
         old = LAST_EXPORT
@@ -200,6 +213,11 @@ def api_export(name):
         if path and os.path.exists(path):
             os.remove(path)  # failed export: no partial file left behind
         EXPORT_LOCK.release()
+
+
+@app.route("/api/export-targets")
+def api_export_targets():
+    return jsonify({"nextcloud": nextcloud.is_configured(), "folder": nextcloud.folder()})
 
 
 @app.route("/api/progress")

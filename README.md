@@ -6,6 +6,12 @@ Signerate is a small Flask app for generating 3D printable signs (3MF or STEP) w
 Signs are organised in **Sets**: a Set is a list of sign texts plus the dimensions and style they
 share. Everything autosaves; there is no Save button.
 
+## Nextcloud export
+
+With a `.env` next to `docker-compose.yml` (see `.env.example`) the export bar offers
+"Nextcloud": the file is uploaded over WebDAV to `NEXTCLOUD_FOLDER`. An existing file is never
+overwritten; the new one gets a number. Signs are marked as exported only after the upload worked.
+
 ## Workflow
 
 **Sign Sets (`/`)** lists every Set, most recently updated first, with a preview in its own style,

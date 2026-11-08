@@ -1,169 +1,620 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
-  <title>Signerate Logo</title>
-  <desc>An industrial name-plate sign in the moment of assembly: the letters S-I-G are seated on an ink-black 3D-printed plate while a signal-yellow N snaps into its recessed slot.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="100%" height="100%">
+  <defs>
+    <!-- ==================== FILTERS ==================== -->
+    <filter id="badge-shadow" x="-15%" y="-15%" width="135%" height="135%">
+      <feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#0B0E10" flood-opacity="0.45" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0B0E10" flood-opacity="0.3" />
+    </filter>
 
-  <!-- ===================================================================== -->
-  <!-- 1. WORKBENCH TRAY / MOUNTING BACKING                                  -->
-  <!-- Ensures high contrast on both Enamel Grey (#D6D8D2) and Anthracite    -->
-  <!-- (#2F3538) backgrounds while framing the sign like a machine jig.      -->
-  <!-- ===================================================================== -->
-  <rect x="28" y="100" width="436" height="316" rx="28" fill="#E9EAE5" stroke="#1B2023" stroke-width="12" stroke-linejoin="round" />
+    <filter id="plate-shadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="-18" dy="32" stdDeviation="18" flood-color="#121618" flood-opacity="0.55" />
+      <feDropShadow dx="-4" dy="8" stdDeviation="5" flood-color="#121618" flood-opacity="0.35" />
+    </filter>
 
-  <!-- Corner alignment datum ticks on the tray (workshop jig precision) -->
-  <path d="M 52 144 V 124 H 72
-           M 52 372 V 392 H 72
-           M 440 372 V 392 H 420" fill="none" stroke="#D6D8D2" stroke-width="6" stroke-linecap="square" />
+    <filter id=" settled-letter-shadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="-3" dy="5" stdDeviation="2.5" flood-color="#090B0C" flood-opacity="0.85" />
+    </filter>
 
-  <!-- ===================================================================== -->
-  <!-- 2. MAIN SIGN PLATE (3D-PRINTED EXTRUDED BASE + HARD DROP SHADOW)      -->
-  <!-- ===================================================================== -->
-  <!-- Hard-edged offset drop shadow -->
-  <rect x="64" y="148" width="388" height="244" rx="18" fill="#1B2023" />
+    <filter id="fly-shadow-low" x="-30%" y="-30%" width="180%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="blur" />
+      <feOffset in="blur" dx="-14" dy="24" result="offsetBlur" />
+      <feComponentTransfer in="offsetBlur" result="shadow">
+        <feFuncA type="linear" slope="0.65" />
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="shadow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
 
-  <!-- Main sign body (Ink #1B2023 with Anthracite top face #2F3538) -->
-  <rect x="52" y="136" width="388" height="244" rx="18" fill="#1B2023" stroke="#1B2023" stroke-width="8" stroke-linejoin="round" />
+    <filter id="fly-shadow-mid" x="-40%" y="-40%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="11" result="blur" />
+      <feOffset in="blur" dx="-28" dy="46" result="offsetBlur" />
+      <feComponentTransfer in="offsetBlur" result="shadow">
+        <feFuncA type="linear" slope="0.5" />
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="shadow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
 
-  <!-- Raised perimeter sign border: Left/Bottom/Top-Left seated in place -->
-  <path d="M 316 156 H 80 A 8 8 0 0 0 72 164 V 352 A 8 8 0 0 0 80 360 H 412 A 8 8 0 0 0 420 352 V 296" fill="none" stroke="#E9EAE5" stroke-width="12" stroke-linecap="square" stroke-linejoin="round" />
+    <filter id="fly-shadow-high" x="-50%" y="-50%" width="220%" height="220%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18" result="blur" />
+      <feOffset in="blur" dx="-45" dy="75" result="offsetBlur" />
+      <feComponentTransfer in="offsetBlur" result="shadow">
+        <feFuncA type="linear" slope="0.38" />
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="shadow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
 
-  <!-- Unfinished / recessed border channel in the assembly zone (top-right) -->
-  <path d="M 332 156 H 412 A 8 8 0 0 1 420 164 V 280" fill="none" stroke="#2F3538" stroke-width="12" stroke-linecap="square" stroke-linejoin="round" stroke-dasharray="16 12" />
+    <filter id="ambient-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
 
-  <!-- ===================================================================== -->
-  <!-- 3. SEATED LETTERS: "S", "I", "G" (BARLOW CONDENSED / HIGHWAY SIGNAGE) -->
-  <!-- All converted to crisp engineered vector paths in Light Grey #E9EAE5  -->
-  <!-- ===================================================================== -->
+    <!-- ==================== GRADIENTS ==================== -->
+    <!-- Workbench Badge -->
+    <linearGradient id="housing-bevel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3E464A" />
+      <stop offset="50%" stop-color="#2F3538" />
+      <stop offset="100%" stop-color="#1B2023" />
+    </linearGradient>
 
-  <!-- Letter "S" (x: 96..164, y: 190..326) -->
-  <path d="M 164 222
-           V 210
-           A 20 20 0 0 0 144 190
-           H 116
-           A 20 20 0 0 0 96 210
-           V 238
-           A 20 20 0 0 0 112 257
-           L 140 265
-           A 6 6 0 0 1 144 271
-           V 300
-           A 6 6 0 0 1 138 306
-           H 122
-           A 6 6 0 0 1 116 300
-           V 290
-           H 96
-           V 306
-           A 20 20 0 0 0 116 326
-           H 144
-           A 20 20 0 0 0 164 306
-           V 270
-           A 20 20 0 0 0 148 251
-           L 120 243
-           A 6 6 0 0 1 116 237
-           V 216
-           A 6 6 0 0 1 122 210
-           H 138
-           A 6 6 0 0 1 144 216
-           V 222
-           Z" fill="#E9EAE5" />
+    <linearGradient id="tray-surface" x1="15%" y1="5%" x2="85%" y2="95%">
+      <stop offset="0%" stop-color="#F1F2EE" />
+      <stop offset="45%" stop-color="#E9EAE5" />
+      <stop offset="100%" stop-color="#D6D8D2" />
+    </linearGradient>
 
-  <!-- Letter "I" (x: 184..208, y: 190..326) -->
-  <rect x="184" y="190" width="24" height="136" rx="3" fill="#E9EAE5" />
+    <linearGradient id="tray-inner-bevel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#B8BCB4" />
+      <stop offset="100%" stop-color="#FFFFFF" />
+    </linearGradient>
 
-  <!-- Letter "G" (x: 228..298, y: 190..326) -->
-  <path d="M 298 226
-           V 210
-           A 20 20 0 0 0 278 190
-           H 248
-           A 20 20 0 0 0 228 210
-           V 306
-           A 20 20 0 0 0 248 326
-           H 278
-           A 20 20 0 0 0 298 306
-           V 252
-           H 262
-           V 272
-           H 276
-           V 300
-           A 6 6 0 0 1 270 306
-           H 256
-           A 6 6 0 0 1 250 300
-           V 216
-           A 6 6 0 0 1 256 210
-           H 270
-           A 6 6 0 0 1 276 216
-           V 226
-           Z" fill="#E9EAE5" />
+    <!-- 3D Sign Plate -->
+    <linearGradient id="plate-top-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2F3538" />
+      <stop offset="35%" stop-color="#22272A" />
+      <stop offset="100%" stop-color="#14181A" />
+    </linearGradient>
 
-  <!-- ===================================================================== -->
-  <!-- 4. RECESSED TARGET SOCKET FOR "N" ON THE SIGN PLATE                   -->
-  <!-- Shows the empty 3D-printed toolpath pocket awaiting the final letter. -->
-  <!-- ===================================================================== -->
-  <path d="M 320 326
-           V 190
-           H 342
-           L 370 268
-           V 190
-           H 392
-           V 326
-           H 370
-           L 342 248
-           V 326
-           Z" fill="#2F3538" stroke="#D6D8D2" stroke-width="3" stroke-linejoin="round" stroke-dasharray="8 6" />
+    <linearGradient id="plate-side-bottom" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1B2023" />
+      <stop offset="70%" stop-color="#121618" />
+      <stop offset="100%" stop-color="#0B0D0E" />
+    </linearGradient>
 
-  <!-- Precision insertion trajectory guides (Signal Yellow #F5C400) -->
-  <line x1="320" y1="190" x2="352" y2="128" stroke="#F5C400" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 10" />
-  <line x1="392" y1="326" x2="444" y2="254" stroke="#F5C400" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 10" />
+    <linearGradient id="plate-side-right" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2A3033" />
+      <stop offset="100%" stop-color="#0B0D0E" />
+    </linearGradient>
 
-  <!-- ===================================================================== -->
-  <!-- 5. FLYING / ASSEMBLING LETTER "N" + CORNER FRAME SEGMENT              -->
-  <!-- Signal Yellow (#F5C400) for the active/new component snapping in.     -->
-  <!-- ===================================================================== -->
-  <g transform="translate(46, -54) rotate(11, 356, 258)">
-    <!-- Detached top-right frame corner flying in with the letter -->
-    <path d="M 324 148 H 416 A 10 10 0 0 1 426 158 V 246" fill="none" stroke="#1B2023" stroke-width="24" stroke-linecap="square" stroke-linejoin="round" />
-    <path d="M 324 148 H 416 A 10 10 0 0 1 426 158 V 246" fill="none" stroke="#F5C400" stroke-width="12" stroke-linecap="square" stroke-linejoin="round" />
+    <!-- Settled Letters & Frame (White/Light Grey Filament) -->
+    <linearGradient id="white-top" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="60%" stop-color="#F2F3F0" />
+      <stop offset="100%" stop-color="#E2E4DF" />
+    </linearGradient>
 
-    <!-- Hard-edged 3D extrusion / shadow under the flying "N" -->
-    <path d="M 310 338
-             V 194
-             A 4 4 0 0 1 314 190
-             H 336
-             A 4 4 0 0 1 340 193
-             L 368 271
-             V 194
-             A 4 4 0 0 1 372 190
-             H 392
-             A 4 4 0 0 1 396 194
-             V 338
-             A 4 4 0 0 1 392 342
-             H 370
-             A 4 4 0 0 1 366 339
-             L 338 261
-             V 338
-             A 4 4 0 0 1 334 342
-             H 314
-             A 4 4 0 0 1 310 338
-             Z" fill="#1B2023" transform="translate(-10, 12)" />
+    <linearGradient id="white-side" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C8CBC4" />
+      <stop offset="50%" stop-color="#9EA39B" />
+      <stop offset="100%" stop-color="#7C827A" />
+    </linearGradient>
 
-    <!-- Signal Yellow "N" with heavy Ink outline (#1B2023) -->
-    <path d="M 310 332
-             V 194
-             A 4 4 0 0 1 314 190
-             H 336
-             A 4 4 0 0 1 340 193
-             L 368 271
-             V 194
-             A 4 4 0 0 1 372 190
-             H 392
-             A 4 4 0 0 1 396 194
-             V 332
-             A 4 4 0 0 1 392 336
-             H 370
-             A 4 4 0 0 1 366 333
-             L 338 255
-             V 332
-             A 4 4 0 0 1 334 336
-             H 314
-             A 4 4 0 0 1 310 332
-             Z" fill="#F5C400" stroke="#1B2023" stroke-width="8" stroke-linejoin="round" />
+    <!-- Signal Yellow Active Assembly Filament -->
+    <linearGradient id="yellow-top" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF066" />
+      <stop offset="25%" stop-color="#F5C400" />
+      <stop offset="85%" stop-color="#E0B000" />
+      <stop offset="100%" stop-color="#C99A00" />
+    </linearGradient>
+
+    <linearGradient id="yellow-side-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C29600" />
+      <stop offset="50%" stop-color="#9E7800" />
+      <stop offset="100%" stop-color="#755800" />
+    </linearGradient>
+
+    <linearGradient id="yellow-side-mid" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#D9A900" />
+      <stop offset="100%" stop-color="#8F6C00" />
+    </linearGradient>
+
+    <linearGradient id="beam-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F5C400" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#F5C400" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#F5C400" stop-opacity="0" />
+    </linearGradient>
+
+    <linearGradient id="infill-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F5C400" stop-opacity="0.6" />
+      <stop offset="70%" stop-color="#F5C400" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#2F3538" stop-opacity="0.4" />
+    </linearGradient>
+
+    <!-- ==================== PATTERNS ==================== -->
+    <!-- Technical Workshop Grid -->
+    <pattern id="workshop-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#C5C8C0" stroke-width="1" stroke-opacity="0.55" />
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#C5C8C0" stroke-width="0.5" stroke-opacity="0.35" />
+      <circle cx="40" cy="40" r="1.2" fill="#9FA49C" opacity="0.6" />
+    </pattern>
+
+    <!-- 3D Print Layer Striations (Micro-texture) -->
+    <pattern id="print-layers" width="8" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+      <line x1="0" y1="0" x2="8" y2="0" stroke="#FFFFFF" stroke-width="0.7" stroke-opacity="0.035" />
+      <line x1="0" y1="2" x2="8" y2="2" stroke="#000000" stroke-width="0.7" stroke-opacity="0.12" />
+    </pattern>
+
+    <!-- Internal Slicer Tri-Hexagon Infill Pattern -->
+    <pattern id="slicer-infill" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
+      <path d="M 0 8 L 16 8 M 8 0 L 8 16 M 0 0 L 16 16" fill="none" stroke="url(#infill-grad)" stroke-width="1.3" />
+    </pattern>
+
+    <!-- Safety Caution Stripes -->
+    <pattern id="hazard-stripes" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect x="0" y="0" width="10" height="20" fill="#F5C400" />
+      <rect x="10" y="0" width="10" height="20" fill="#1B2023" />
+    </pattern>
+
+    <!-- ==================== CLIP PATHS ==================== -->
+    <clipPath id="tray-clip">
+      <rect x="92" y="92" width="816" height="816" rx="108" />
+    </clipPath>
+
+    <clipPath id="plate-top-clip">
+      <rect x="-320" y="-140" width="640" height="280" rx="36" />
+    </clipPath>
+
+    <!-- ==================== REUSABLE GLYPH DEFINITIONS (BARLOW CONDENSED BOLD) ==================== -->
+    <!-- All glyphs centered on their own local origin (0,0) with standard height 140 (-70 to +70) -->
+    
+    <!-- 'S' Glyph (Width: 88, X: -44 to 44) -->
+    <path id="glyph-S" d="M -44 -42 C -44 -59 -31 -70 -14 -70 L 14 -70 C 31 -70 44 -59 44 -42 L 44 -30 L 16 -30 L 16 -40 C 16 -44 13 -47 8 -47 L -8 -47 C -13 -47 -16 -44 -16 -40 L -16 -24 C -16 -19 -13 -16 -6 -14 L 20 -6 C 36 -1 44 9 44 26 L 44 42 C 44 59 31 70 14 70 L -14 70 C -31 70 -44 59 -44 42 L -44 28 L -16 28 L -16 40 C -16 44 -13 47 -8 47 L 8 47 C 13 47 16 44 16 40 L 16 22 C 16 17 13 14 6 12 L -20 4 C -36 -1 -44 -11 -44 -26 Z" />
+
+    <!-- 'I' Glyph (Width: 32, X: -16 to 16) -->
+    <path id="glyph-I" d="M -16 -70 L 16 -70 L 16 70 L -16 70 Z" />
+
+    <!-- 'G' Glyph (Width: 92, X: -46 to 46) -->
+    <path id="glyph-G" d="M -46 -40 C -46 -58 -32 -70 -14 -70 L 14 -70 C 32 -70 46 -58 46 -40 L 46 -24 L 18 -24 L 18 -38 C 18 -43 14 -47 8 -47 L -8 -47 C -14 -47 -18 -43 -18 -38 L -18 38 C -18 43 -14 47 -8 47 L 8 47 C 14 47 18 43 18 38 L 18 14 L -2 14 L -2 -8 L 46 -8 L 46 40 C 46 58 32 70 14 70 L -14 70 C -32 70 -46 58 -46 40 Z" />
+
+    <!-- 'N' Glyph (Width: 96, X: -48 to 48) -->
+    <path id="glyph-N" d="M -48 -70 L -20 -70 L 20 12 L 20 -70 L 48 -70 L 48 70 L 20 70 L -20 -12 L -20 70 L -48 70 Z" />
+
+    <!-- 'E' Glyph (Width: 84, X: -42 to 42) -->
+    <path id="glyph-E" d="M -42 -70 L 42 -70 L 42 -45 L -14 -45 L -14 -12 L 32 -12 L 32 12 L -14 12 L -14 45 L 42 45 L 42 70 L -42 70 Z" />
+
+    <!-- Corner Screw Component -->
+    <g id="mounting-bolt">
+      <circle cx="0" cy="0" r="14" fill="#1B2023" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.4" />
+      <circle cx="0" cy="0" r="11" fill="#2F3538" />
+      <polygon points="0,-7 6,-3.5 6,3.5 0,7 -6,3.5 -6,-3.5" fill="#14181A" stroke="#3E464A" stroke-width="0.8" />
+      <circle cx="-3" cy="-3" r="9" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.15" />
+    </g>
+  </defs>
+
+  <!-- ========================================================================= -->
+  <!-- 1. OUTER MACHINE HOUSING & WORKBENCH TRAY (Self-contained for any BG)     -->
+  <!-- ========================================================================= -->
+  <g filter="url(#badge-shadow)">
+    <!-- Outer Enamel Rim (Guarantees separation on dark #2F3538 background) -->
+    <rect x="50" y="50" width="900" height="900" rx="140" fill="#D6D8D2" stroke="#1B2023" stroke-width="4" />
+    
+    <!-- Anthracite Machine Bezel -->
+    <rect x="64" y="64" width="872" height="872" rx="128" fill="url(#housing-bevel)" stroke="#14181A" stroke-width="3" />
+    
+    <!-- Bezel Highlight -->
+    <rect x="67" y="67" width="866" height="866" rx="125" fill="none" stroke="#525B60" stroke-width="1.5" opacity="0.6" />
+
+    <!-- Recessed Light Grey Work Surface (#E9EAE5) -->
+    <rect x="92" y="92" width="816" height="816" rx="108" fill="url(#tray-surface)" />
+  </g>
+
+  <!-- Clipped Workbench Interior Elements -->
+  <g clip-path="url(#tray-clip)">
+    <!-- Technical Grid Overlay -->
+    <rect x="92" y="92" width="816" height="816" fill="url(#workshop-grid)" />
+
+    <!-- Top Control Strip (Anthracite #2F3538 UI Header) -->
+    <g>
+      <rect x="92" y="92" width="816" height="58" fill="#2F3538" />
+      <line x1="92" y1="150" x2="908" y2="150" stroke="#1B2023" stroke-width="3" />
+      <line x1="92" y1="152" x2="908" y2="152" stroke="#FFFFFF" stroke-width="1.5" opacity="0.5" />
+
+      <!-- UI Status LEDs & Precision Markings -->
+      <circle cx="155" cy="121" r="6" fill="#F5C400" filter="url(#ambient-glow)" />
+      <circle cx="177" cy="121" r="5" fill="#D6D8D2" opacity="0.35" />
+      <circle cx="197" cy="121" r="5" fill="#D6D8D2" opacity="0.35" />
+
+      <!-- Mini Ruler / Caliper Ticks on Header -->
+      <path d="M 380 150 L 380 138 M 400 150 L 400 142 M 420 150 L 420 138 M 440 150 L 440 142 M 460 150 L 460 134 M 480 150 L 480 142 M 500 150 L 500 138 M 520 150 L 520 142 M 540 150 L 540 134 M 560 150 L 560 142 M 580 150 L 580 138 M 600 150 L 600 142 M 620 150 L 620 138" stroke="#D6D8D2" stroke-width="1.5" opacity="0.4" />
+
+      <!-- Right Side Caution Stripe Accent -->
+      <rect x="740" y="111" width="110" height="20" rx="4" fill="url(#hazard-stripes)" stroke="#1B2023" stroke-width="1.5" />
+    </g>
+
+    <!-- Bottom Control Strip (Anthracite #2F3538 UI Footer) -->
+    <g>
+      <rect x="92" y="852" width="816" height="56" fill="#2F3538" />
+      <line x1="92" y1="852" x2="908" y2="852" stroke="#1B2023" stroke-width="3" />
+      
+      <!-- Progress Bar Track -->
+      <rect x="160" y="874" width="440" height="12" rx="6" fill="#1B2023" />
+      <!-- Active Progress Fill (72% Assembled) -->
+      <rect x="162" y="876" width="310" height="8" rx="4" fill="#F5C400" />
+      <!-- Progress Readout Pill -->
+      <rect x="620" y="868" width="90" height="24" rx="5" fill="#1B2023" stroke="#525B60" stroke-width="1" />
+      <!-- "3MF" Vector Micro-Label -->
+      <path d="M 638 875 L 647 875 L 643 879 L 647 881 L 647 885 L 638 885 M 653 885 L 653 875 L 658 881 L 663 875 L 663 885 M 669 885 L 669 875 L 677 875 M 669 880 L 675 880" fill="none" stroke="#F5C400" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="694" cy="880" r="4" fill="#F5C400" />
+    </g>
+
+    <!-- Workbench Print-Bed Calibration Target Lines -->
+    <g opacity="0.45">
+      <line x1="92" y1="490" x2="908" y2="490" stroke="#9FA49C" stroke-width="1.5" stroke-dasharray="8 6" />
+      <line x1="485" y1="150" x2="485" y2="852" stroke="#9FA49C" stroke-width="1.5" stroke-dasharray="8 6" />
+      <!-- Dimension Callout Left -->
+      <line x1="128" y1="340" x2="128" y2="620" stroke="#7C827A" stroke-width="1.5" />
+      <line x1="120" y1="340" x2="136" y2="340" stroke="#7C827A" stroke-width="1.5" />
+      <line x1="120" y1="620" x2="136" y2="620" stroke="#7C827A" stroke-width="1.5" />
+    </g>
+
+    <!-- Corner Mounting Bolts on Work Surface -->
+    <use href="#mounting-bolt" x="135" y="190" />
+    <use href="#mounting-bolt" x="865" y="190" />
+    <use href="#mounting-bolt" x="135" y="810" />
+    <use href="#mounting-bolt" x="865" y="810" />
+
+    <!-- Inner Shadow of Recessed Tray -->
+    <rect x="92" y="92" width="816" height="816" rx="108" fill="none" stroke="#1B2023" stroke-width="6" opacity="0.18" />
+  </g>
+
+  <!-- Tray Rim Bevel Highlight -->
+  <rect x="90" y="90" width="820" height="820" rx="110" fill="none" stroke="url(#tray-inner-bevel)" stroke-width="2.5" opacity="0.7" />
+
+
+  <!-- ========================================================================= -->
+  <!-- 2. THE 3D SIGN PLATE (Tilted in perspective, mid-assembly)                -->
+  <!-- ========================================================================= -->
+  <!-- Center of plate is at (485, 500), rotated -11 deg for dynamic workshop angle -->
+  <g transform="translate(485, 500) rotate(-11)">
+
+    <!-- Precision CAD Bounding Box around the plate on the workbench -->
+    <g transform="translate(-8, 14)" opacity="0.55">
+      <rect x="-345" y="-165" width="706" height="346" rx="44" fill="none" stroke="#1B2023" stroke-width="1.5" stroke-dasharray="10 6" />
+      <!-- Corner Register Ticks -->
+      <path d="M -355 -140 L -355 -175 L -320 -175" fill="none" stroke="#1B2023" stroke-width="2.5" />
+      <path d="M 336 -175 L 371 -175 L 371 -140" fill="none" stroke="#1B2023" stroke-width="2.5" />
+      <path d="M -355 156 L -355 191 L -320 191" fill="none" stroke="#1B2023" stroke-width="2.5" />
+      <path d="M 336 191 L 371 191 L 371 156" fill="none" stroke="#1B2023" stroke-width="2.5" />
+    </g>
+
+    <!-- ---- PLATE THICKNESS / 3D EXTRUSION WALLS (Depth = dx: +14, dy: +28) ---- -->
+    <g filter="url(#plate-shadow)">
+      <!-- Stacked Solid Layers to create smooth, true rounded 3D extrusion -->
+      <rect x="-306" y="-112" width="640" height="280" rx="36" fill="#0B0D0E" stroke="#0B0D0E" stroke-width="2" />
+      <rect x="-308" y="-116" width="640" height="280" rx="36" fill="#0E1113" />
+      <rect x="-310" y="-120" width="640" height="280" rx="36" fill="#121618" />
+      <rect x="-312" y="-124" width="640" height="280" rx="36" fill="#151A1C" />
+      <rect x="-314" y="-128" width="640" height="280" rx="36" fill="#181D20" />
+      <rect x="-316" y="-132" width="640" height="280" rx="36" fill="#1B2023" />
+      <rect x="-318" y="-136" width="640" height="280" rx="36" fill="#22272A" />
+
+      <!-- Crisp Side Bevel Shading -->
+      <path d="M -284 140 L 298 140 C 312 140 320 128 320 114 L 334 142 C 334 156 322 168 304 168 L -270 168 C -290 168 -304 155 -306 138 L -320 110 C -318 128 -302 140 -284 140 Z" fill="url(#plate-side-bottom)" />
+      
+      <!-- 3D Print Layer Lines along the bottom edge -->
+      <path d="M -275 147 L 295 147 M -272 154 L 298 154 M -269 161 L 301 161" stroke="#3E464A" stroke-width="1" opacity="0.45" />
+    </g>
+
+    <!-- ---- PLATE TOP FACE ---- -->
+    <g clip-path="url(#plate-top-clip)">
+      <!-- Main Ink-Black Top Surface -->
+      <rect x="-320" y="-140" width="640" height="280" rx="36" fill="url(#plate-top-grad)" />
+      
+      <!-- Subtle 3D Print Top Surface Texture -->
+      <rect x="-320" y="-140" width="640" height="280" fill="url(#print-layers)" />
+
+      <!-- UNFINISHED RIGHT ZONE: Exposed 3D Slicer Honeycomb/Triangle Infill -->
+      <g>
+        <!-- Recessed Pocket where top skin isn't printed yet -->
+        <polygon points="95,-145 330,-145 330,145 25,145" fill="#121618" />
+        <!-- Inner Ledge Shadow -->
+        <polyline points="95,-145 25,145" fill="none" stroke="#080A0B" stroke-width="6" opacity="0.8" />
+        <!-- Exposed Yellow/Anthracite Internal Infill Grid -->
+        <polygon points="95,-145 330,-145 330,145 25,145" fill="url(#slicer-infill)" />
+        
+        <!-- Active Laser/Extrusion Cut Line across the plate -->
+        <line x1="95" y1="-145" x2="25" y2="145" stroke="#F5C400" stroke-width="3" filter="url(#ambient-glow)" />
+        <line x1="95" y1="-145" x2="25" y2="145" stroke="#FFF6A1" stroke-width="1" />
+      </g>
+
+      <!-- Top Specular Edge Highlight -->
+      <rect x="-318" y="-138" width="636" height="276" rx="34" fill="none" stroke="#525B60" stroke-width="2" opacity="0.45" />
+    </g>
+
+    <!-- ---- RAISED OUTER SIGN BORDER FRAME (Settled Left vs Assembling Right) ---- -->
+    <!-- Extruded White Border (Completed Left & Bottom/Top sections) -->
+    <g filter="url(#settled-letter-shadow)">
+      <!-- 3D Extrusion of Frame (offset +3, +5) -->
+      <path d="M 88 -118 L -284 -118 C -295 -118 -302 -111 -302 -100 L -302 100 C -302 111 -295 118 -284 118 L 32 118" transform="translate(3, 5)" fill="none" stroke="url(#white-side)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+      <!-- Top Face of Frame -->
+      <path d="M 88 -118 L -284 -118 C -295 -118 -302 -111 -302 -100 L -302 100 C -302 111 -295 118 -284 118 L 32 118" fill="none" stroke="url(#white-top)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+      <!-- Frame Highlight -->
+      <path d="M 88 -121 L -284 -121 C -295 -121 -305 -111 -305 -100 L -305 100" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" opacity="0.9" />
+    </g>
+
+    <!-- Blueprint Ghost Track for the Unfinished Right Border -->
+    <path d="M 88 -118 L 284 -118 C 295 -118 302 -111 302 -100 L 302 100 C 302 111 295 118 284 118 L 32 118" fill="none" stroke="#F5C400" stroke-width="12" stroke-opacity="0.15" stroke-linecap="round" />
+    <path d="M 88 -118 L 284 -118 C 295 -118 302 -111 302 -100 L 302 100 C 302 111 295 118 284 118 L 32 118" fill="none" stroke="#F5C400" stroke-width="2" stroke-dasharray="8 8" stroke-opacity="0.75" />
+
+    <!-- Mounting Holes on the Sign Plate -->
+    <g transform="translate(-268, 0)">
+      <circle cx="0" cy="0" r="14" fill="#0E1113" stroke="#3E464A" stroke-width="2" />
+      <circle cx="2" cy="3" r="10" fill="#1B2023" />
+      <circle cx="2" cy="3" r="7" fill="#D6D8D2" />
+      <path d="M -5 0 A 7 7 0 0 1 9 0" fill="none" stroke="#9FA49C" stroke-width="2" />
+    </g>
+    <!-- Unfinished Right Mounting Hole (Wireframe) -->
+    <g transform="translate(268, 0)">
+      <circle cx="0" cy="0" r="14" fill="#0E1113" stroke="#F5C400" stroke-width="1.5" stroke-dasharray="5 4" />
+      <circle cx="0" cy="0" r="7" fill="none" stroke="#F5C400" stroke-width="1.5" opacity="0.6" />
+      <line x1="-18" y1="0" x2="18" y2="0" stroke="#F5C400" stroke-width="1" opacity="0.5" />
+      <line x1="0" y1="-18" x2="0" y2="18" stroke="#F5C400" stroke-width="1" opacity="0.5" />
+    </g>
+
+
+    <!-- ===================================================================== -->
+    <!-- 3. TARGET BLUEPRINT SOCKETS ON THE PLATE (For 'G', 'N', 'E')          -->
+    <!-- ===================================================================== -->
+    <!-- Letter Centers: S(-200,0), I(-114,0), G(-26,0), N(88,0), E(196,0)     -->
+    
+    <!-- Socket 'G' (x: -26, almost locked in) -->
+    <g transform="translate(-26, 0)">
+      <use href="#glyph-G" fill="#14181A" stroke="#F5C400" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.85" />
+      <!-- Corner Homing Target Ticks -->
+      <path d="M -54 -55 L -54 -78 L -30 -78 M 30 -78 L 54 -78 L 54 -55 M -54 55 L -54 78 L -30 78 M 30 78 L 54 78 L 54 55" fill="none" stroke="#F5C400" stroke-width="2" opacity="0.7" />
+    </g>
+
+    <!-- Socket 'N' (x: 88, mid-assembly) -->
+    <g transform="translate(88, 0)">
+      <use href="#glyph-N" fill="#101315" fill-opacity="0.7" stroke="#F5C400" stroke-width="2" stroke-dasharray="8 5" opacity="0.8" />
+      <!-- Internal Toolpath Crosshairs -->
+      <line x1="-34" y1="-70" x2="-34" y2="70" stroke="#F5C400" stroke-width="1" stroke-dasharray="4 4" opacity="0.4" />
+      <line x1="34" y1="-70" x2="34" y2="70" stroke="#F5C400" stroke-width="1" stroke-dasharray="4 4" opacity="0.4" />
+      <circle cx="-34" cy="-45" r="3.5" fill="#F5C400" opacity="0.8" />
+      <circle cx="34" cy="45" r="3.5" fill="#F5C400" opacity="0.8" />
+    </g>
+
+    <!-- Socket 'E' (x: 196, newly generated slot) -->
+    <g transform="translate(196, 0)">
+      <use href="#glyph-E" fill="#0D1012" fill-opacity="0.85" stroke="#F5C400" stroke-width="2" stroke-dasharray="5 5" opacity="0.9" />
+      <path d="M -50 -55 L -50 -78 L -26 -78 M 26 -78 L 50 -78 L 50 -55 M -50 55 L -50 78 L -26 78 M 26 78 L 50 78 L 50 55" fill="none" stroke="#F5C400" stroke-width="2" opacity="0.85" />
+      <circle cx="0" cy="0" r="4" fill="#F5C400" filter="url(#ambient-glow)" />
+    </g>
+
+
+    <!-- ===================================================================== -->
+    <!-- 4. SETTLED, COMPLETED 3D LETTERS ('S' and 'I')                        -->
+    <!-- ===================================================================== -->
+    
+    <!-- LETTER 'S' (Fully Seated & Extruded in Crisp White) -->
+    <g transform="translate(-200, 0)" filter="url(#settled-letter-shadow)">
+      <!-- 3D Extruded Side Walls (Stacked 1px steps from (5,9) to (0,0)) -->
+      <use href="#glyph-S" transform="translate(5, 9)" fill="#7C827A" />
+      <use href="#glyph-S" transform="translate(4, 7.2)" fill="#8D938B" />
+      <use href="#glyph-S" transform="translate(3, 5.4)" fill="#9EA39B" />
+      <use href="#glyph-S" transform="translate(2, 3.6)" fill="#B4B8B0" />
+      <use href="#glyph-S" transform="translate(1, 1.8)" fill="#CFD2CB" />
+      <!-- Top Face -->
+      <use href="#glyph-S" fill="url(#white-top)" />
+      <!-- Bevel Rim Highlight -->
+      <use href="#glyph-S" fill="none" stroke="#FFFFFF" stroke-width="1.5" />
+    </g>
+
+    <!-- LETTER 'I' (Fully Seated & Extruded in Crisp White) -->
+    <g transform="translate(-114, 0)" filter="url(#settled-letter-shadow)">
+      <!-- 3D Extruded Side Walls -->
+      <use href="#glyph-I" transform="translate(5, 9)" fill="#7C827A" />
+      <use href="#glyph-I" transform="translate(4, 7.2)" fill="#8D938B" />
+      <use href="#glyph-I" transform="translate(3, 5.4)" fill="#9EA39B" />
+      <use href="#glyph-I" transform="translate(2, 3.6)" fill="#B4B8B0" />
+      <use href="#glyph-I" transform="translate(1, 1.8)" fill="#CFD2CB" />
+      <!-- Top Face -->
+      <use href="#glyph-I" fill="url(#white-top)" />
+      <!-- Bevel Rim Highlight -->
+      <use href="#glyph-I" fill="none" stroke="#FFFFFF" stroke-width="1.5" />
+    </g>
+
+
+    <!-- ===================================================================== -->
+    <!-- 5. FLYING LETTERS & BORDER FRAGMENTS SETTLING INTO PLACE              -->
+    <!-- ===================================================================== -->
+
+    <!-- ---- STAGE 1: LETTER 'G' (Low Altitude, Locking into Socket) ---- -->
+    <!-- Target: (-26, 0) | Current Pos: (-10, -34) | Scale: 1.05 -->
+    <g>
+      <!-- Glowing Alignment Guide Pillars (Connecting Socket Corners to Flying G) -->
+      <path d="M -72 -40 L -56 -74 L 36 -74 L 20 -40 Z" fill="url(#beam-grad)" opacity="0.55" />
+      <line x1="-72" y1="-40" x2="-56" y2="-74" stroke="#F5C400" stroke-width="2" stroke-dasharray="4 3" />
+      <line x1="20" y1="-40" x2="36" y2="-74" stroke="#F5C400" stroke-width="2" stroke-dasharray="4 3" />
+      <line x1="-26" y1="68" x2="-10" y2="34" stroke="#F5C400" stroke-width="2.5" stroke-dasharray="4 3" />
+      
+      <!-- Target Snap Sparks -->
+      <circle cx="-26" cy="68" r="4" fill="#FFF066" filter="url(#ambient-glow)" />
+      <circle cx="-72" cy="-40" r="3.5" fill="#FFF066" />
+
+      <!-- Flying 3D Letter 'G' (Transitioning from Signal Yellow to White) -->
+      <g transform="translate(-10, -34) rotate(4) scale(1.05)" filter="url(#fly-shadow-low)">
+        <!-- Deep 3D Extrusion Layers (Signal Yellow Active Rim) -->
+        <use href="#glyph-G" transform="translate(7, 13)" fill="#8F6C00" stroke="#1B2023" stroke-width="1.5" />
+        <use href="#glyph-G" transform="translate(6, 11)" fill="#A88000" />
+        <use href="#glyph-G" transform="translate(5, 9)" fill="#C29600" />
+        <use href="#glyph-G" transform="translate(4, 7)" fill="#DBAA00" />
+        <use href="#glyph-G" transform="translate(3, 5)" fill="#F5C400" />
+        <use href="#glyph-G" transform="translate(1.5, 2.5)" fill="#FFF066" />
+        <!-- Crisp White Top Face with Yellow Energized Rim -->
+        <use href="#glyph-G" fill="url(#white-top)" stroke="#F5C400" stroke-width="2.5" />
+        <use href="#glyph-G" fill="none" stroke="#FFFFFF" stroke-width="1.2" />
+      </g>
+    </g>
+
+
+    <!-- ---- STAGE 2: LETTER 'N' (Mid-Altitude, Dynamic Swoop & Rotation) ---- -->
+    <!-- Target: (88, 0) | Current Pos: (132, -108) | Scale: 1.16 -->
+    <g>
+      <!-- Sweeping Motion Volume / Trajectory Ribbon -->
+      <path d="M 40 -70 Q 75 -135 80 -185 L 185 -185 Q 175 -125 136 70 Z" fill="url(#beam-grad)" opacity="0.4" />
+      
+      <!-- Precision Trajectory Curves from Socket to Flying 'N' -->
+      <path d="M 54 -45 Q 82 -115 94 -165" fill="none" stroke="#F5C400" stroke-width="2.5" stroke-dasharray="8 5" />
+      <path d="M 122 45 Q 152 -20 172 -62" fill="none" stroke="#F5C400" stroke-width="2.5" stroke-dasharray="8 5" />
+      <path d="M 88 0 Q 115 -60 132 -108" fill="none" stroke="#FFF066" stroke-width="1.5" opacity="0.85" />
+
+      <!-- Flying 3D Letter 'N' (Signal Yellow #F5C400 with Thick Extrusion) -->
+      <g transform="translate(132, -108) rotate(14) scale(1.16)" filter="url(#fly-shadow-mid)">
+        <!-- Heavy 3D Extruded Side Volume (10 Layers for Rich Perspective Thickness) -->
+        <use href="#glyph-N" transform="translate(9, 16)" fill="#594300" stroke="#1B2023" stroke-width="2" />
+        <use href="#glyph-N" transform="translate(8, 14.2)" fill="#705500" />
+        <use href="#glyph-N" transform="translate(7, 12.4)" fill="#856500" />
+        <use href="#glyph-N" transform="translate(6, 10.6)" fill="#997400" />
+        <use href="#glyph-N" transform="translate(5, 8.8)" fill="#AD8400" />
+        <use href="#glyph-N" transform="translate(4, 7.0)" fill="#C29600" />
+        <use href="#glyph-N" transform="translate(3, 5.2)" fill="#D6A600" />
+        <use href="#glyph-N" transform="translate(2, 3.4)" fill="#E8B600" />
+        <use href="#glyph-N" transform="translate(1, 1.6)" fill="#F5C400" />
+        
+        <!-- Top Face in Signal Yellow -->
+        <use href="#glyph-N" fill="url(#yellow-top)" stroke="#1B2023" stroke-width="1.5" />
+        <!-- Inner Specular Bevel -->
+        <use href="#glyph-N" fill="none" stroke="#FFF8B8" stroke-width="2" opacity="0.85" />
+
+        <!-- CAD Axis Widget Attached to Flying Letter -->
+        <g transform="translate(-48, -70)">
+          <line x1="0" y1="0" x2="28" y2="0" stroke="#1B2023" stroke-width="2.5" />
+          <line x1="0" y1="0" x2="0" y2="-28" stroke="#1B2023" stroke-width="2.5" />
+          <circle cx="0" cy="0" r="4.5" fill="#FFFFFF" stroke="#1B2023" stroke-width="2" />
+        </g>
+      </g>
+    </g>
+
+
+    <!-- ---- STAGE 3: FLYING BORDER CORNER FRAGMENTS (Assembling the Frame) ---- -->
+    <!-- Top-Right Frame Corner Piece Flying In -->
+    <g>
+      <path d="M 180 -118 L 225 -195 M 302 -40 L 352 -115" stroke="#F5C400" stroke-width="1.8" stroke-dasharray="6 5" opacity="0.75" />
+      <g transform="translate(52, -78) rotate(12)" filter="url(#fly-shadow-low)">
+        <!-- Extruded Depth -->
+        <path d="M 110 -118 L 284 -118 C 295 -118 302 -111 302 -100 L 302 -10" transform="translate(5, 9)" fill="none" stroke="#755800" stroke-width="15" stroke-linecap="round" />
+        <path d="M 110 -118 L 284 -118 C 295 -118 302 -111 302 -100 L 302 -10" transform="translate(2.5, 4.5)" fill="none" stroke="#C29600" stroke-width="15" stroke-linecap="round" />
+        <!-- Top Yellow Face -->
+        <path d="M 110 -118 L 284 -118 C 295 -118 302 -111 302 -100 L 302 -10" fill="none" stroke="url(#yellow-top)" stroke-width="14" stroke-linecap="round" />
+        <path d="M 110 -121 L 284 -121 C 295 -121 302 -114 302 -103" fill="none" stroke="#FFF8B8" stroke-width="2" stroke-linecap="round" />
+      </g>
+    </g>
+
+    <!-- Bottom-Right Frame Corner Piece Flying In -->
+    <g>
+      <path d="M 284 118 L 340 175 M 140 118 L 185 170" stroke="#F5C400" stroke-width="1.8" stroke-dasharray="6 5" opacity="0.75" />
+      <g transform="translate(48, 56) rotate(-10)" filter="url(#fly-shadow-low)">
+        <!-- Extruded Depth -->
+        <path d="M 302 25 L 302 100 C 302 111 295 118 284 118 L 65 118" transform="translate(5, 9)" fill="none" stroke="#7C827A" stroke-width="15" stroke-linecap="round" />
+        <path d="M 302 25 L 302 100 C 302 111 295 118 284 118 L 65 118" transform="translate(2.5, 4.5)" fill="none" stroke="#B4B8B0" stroke-width="15" stroke-linecap="round" />
+        <!-- Top White Face with Yellow Tip -->
+        <path d="M 302 25 L 302 100 C 302 111 295 118 284 118 L 65 118" fill="none" stroke="url(#white-top)" stroke-width="14" stroke-linecap="round" />
+      </g>
+    </g>
+
+
+    <!-- ---- STAGE 4: LETTER 'E' (High Altitude, Closest to Viewer, Hero Piece) ---- -->
+    <!-- Target: (196, 0) | Current Pos: (290, -210) | Scale: 1.34 -->
+    <g>
+      <!-- Broad Dramatic Volumetric Assembly Cone -->
+      <path d="M 154 -70 Q 210 -180 220 -310 L 365 -260 Q 315 -120 238 70 Z" fill="url(#beam-grad)" opacity="0.5" />
+
+      <!-- High-Velocity Swooping Trajectory Lines -->
+      <path d="M 154 -70 C 185 -160, 205 -220, 232 -295" fill="none" stroke="#F5C400" stroke-width="3" stroke-dasharray="10 6" />
+      <path d="M 238 -70 C 275 -150, 310 -200, 355 -255" fill="none" stroke="#F5C400" stroke-width="2.5" stroke-dasharray="10 6" />
+      <path d="M 196 0 C 235 -90, 260 -150, 290 -210" fill="none" stroke="#FFF066" stroke-width="2" />
+      <path d="M 238 70 C 280 -10, 315 -75, 342 -125" fill="none" stroke="#F5C400" stroke-width="3" stroke-dasharray="10 6" />
+
+      <!-- Floating Mid-Air Calibration Nodes along Path -->
+      <circle cx="222" cy="-145" r="5" fill="#F5C400" filter="url(#ambient-glow)" />
+      <circle cx="262" cy="-152" r="3.5" fill="#FFFFFF" />
+      <circle cx="305" cy="-95" r="4.5" fill="#F5C400" />
+
+      <!-- Hero Flying 3D Letter 'E' (Massive Depth & Perspective Scale) -->
+      <g transform="translate(290, -210) rotate(24) scale(1.34)" filter="url(#fly-shadow-high)">
+        <!-- Deep 3D Extruded Block (14 Stacked Layers for Pronounced Physical Thickness) -->
+        <use href="#glyph-E" transform="translate(12, 21)" fill="#423200" stroke="#1B2023" stroke-width="2.2" />
+        <use href="#glyph-E" transform="translate(11, 19.2)" fill="#544000" />
+        <use href="#glyph-E" transform="translate(10, 17.5)" fill="#664E00" />
+        <use href="#glyph-E" transform="translate(9, 15.7)" fill="#785C00" />
+        <use href="#glyph-E" transform="translate(8, 14.0)" fill="#8A6A00" />
+        <use href="#glyph-E" transform="translate(7, 12.2)" fill="#9C7800" />
+        <use href="#glyph-E" transform="translate(6, 10.5)" fill="#AE8600" />
+        <use href="#glyph-E" transform="translate(5, 8.7)" fill="#C09400" />
+        <use href="#glyph-E" transform="translate(4, 7.0)" fill="#D1A300" />
+        <use href="#glyph-E" transform="translate(3, 5.2)" fill="#E0B000" />
+        <use href="#glyph-E" transform="translate(2, 3.5)" fill="#EDC000" />
+        <use href="#glyph-E" transform="translate(1, 1.7)" fill="#F5C400" />
+
+        <!-- 3D Print Layer Ridges on the Extruded Side of 'E' -->
+        <path d="M -38 74 L 46 74 M -34 79 L 50 79 M -30 84 L 54 84" stroke="#423200" stroke-width="1.2" opacity="0.6" />
+
+        <!-- Top Face of 'E' in Radiant Signal Yellow -->
+        <use href="#glyph-E" fill="url(#yellow-top)" stroke="#1B2023" stroke-width="1.8" />
+
+        <!-- Geometric Specular Highlight & CAD Wireframe Overlay -->
+        <use href="#glyph-E" fill="none" stroke="#FFFAD1" stroke-width="2.2" opacity="0.9" />
+        
+        <!-- Slicer Toolpath Inner Contour Line on the Hero Letter -->
+        <path d="M -34 -62 L 34 -62 M -34 -62 L -34 62 L 34 62" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.75" />
+
+        <!-- Precision Anchor Handles on Corners of 'E' -->
+        <rect x="-46" y="-74" width="8" height="8" fill="#FFFFFF" stroke="#1B2023" stroke-width="2" />
+        <rect x="38" y="-74" width="8" height="8" fill="#FFFFFF" stroke="#1B2023" stroke-width="2" />
+        <rect x="-46" y="66" width="8" height="8" fill="#FFFFFF" stroke="#1B2023" stroke-width="2" />
+        <rect x="38" y="66" width="8" height="8" fill="#F5C400" stroke="#1B2023" stroke-width="2" />
+      </g>
+    </g>
+  </g>
+
+
+  <!-- ========================================================================= -->
+  <!-- 6. FOREGROUND WORKSHOP HUD DETAILS & PARTICLE ACCENTS                     -->
+  <!-- ========================================================================= -->
+  <g pointer-events="none">
+    <!-- Floating Extrusion Filament Micro-Fragments in Upper Right -->
+    <g transform="translate(815, 225) rotate(32)">
+      <rect x="-12" y="-5" width="24" height="10" rx="3" fill="#9E7800" transform="translate(3, 5)" />
+      <rect x="-12" y="-5" width="24" height="10" rx="3" fill="#F5C400" stroke="#1B2023" stroke-width="1.5" />
+    </g>
+    <g transform="translate(615, 195) rotate(-18)">
+      <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#9E7800" transform="translate(3, 4)" />
+      <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#F5C400" stroke="#1B2023" stroke-width="1.5" />
+    </g>
+    <g transform="translate(845, 420) rotate(55)">
+      <rect x="-10" y="-4" width="20" height="8" rx="2" fill="#7C827A" transform="translate(2, 4)" />
+      <rect x="-10" y="-4" width="20" height="8" rx="2" fill="#FFFFFF" stroke="#1B2023" stroke-width="1.5" />
+    </g>
+
+    <!-- Crisp Technical Callout Line on Left Workbench Area -->
+    <g opacity="0.75">
+      <polyline points="205,725 245,765 345,765" fill="none" stroke="#1B2023" stroke-width="2" />
+      <circle cx="205" cy="725" r="4" fill="#F5C400" stroke="#1B2023" stroke-width="2" />
+      <!-- Vector Technical Micro-Bars representing Specs -->
+      <rect x="255" y="747" width="55" height="6" rx="2" fill="#1B2023" />
+      <rect x="316" y="747" width="24" height="6" rx="2" fill="#F5C400" />
+      <rect x="255" y="756" width="85" height="4" rx="1.5" fill="#7C827A" />
+    </g>
   </g>
 </svg>

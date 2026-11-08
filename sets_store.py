@@ -591,7 +591,7 @@ def export_filename(name, first_text, count, settings, fmt):
     return f"{name.replace(' ', '_')}-{word or 'Sign'}{more}-{size}.{fmt}"
 
 
-def run_export(name, scope, fmt, output_path, generate, progress=None):
+def run_export(name, scope, fmt, output_path, generate, progress=None, deliver=None):
     """Exports signs of a Set. `generate(texts, font_sizes, settings, path, fmt, progress)`
     builds the file. Only after it succeeded are the signs marked as exported."""
     if scope not in ("new", "all"):
@@ -624,6 +624,10 @@ def run_export(name, scope, fmt, output_path, generate, progress=None):
     sizes = [plan["sizes"][i] for i, _ in selected]
     generate(texts, sizes, settings, str(output_path), fmt, progress)
 
+    filename = export_filename(name, selected[0][1]["text"], len(selected), settings, fmt)
+    if deliver:  # may rename; a failure here must leave every sign unmarked
+        filename = deliver(str(output_path), filename)
+
     exported_ids = {s["id"]: s["text"] for _, s in selected}
     with LOCK:
         try:
@@ -643,6 +647,6 @@ def run_export(name, scope, fmt, output_path, generate, progress=None):
 
     return {
         "count": len(selected),
-        "filename": export_filename(name, selected[0][1]["text"], len(selected), settings, fmt),
+        "filename": filename,
         "set": cur,
     }
