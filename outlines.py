@@ -227,11 +227,11 @@ def _build_ornament(W, H, v):
     p = _Path(r, ch).line(c - hw, ch)
     p.cubic((c - hw / 2, ch), (c - hw * 0.364, 0), (c, 0))
     p.cubic((c + hw * 0.364, 0), (c + hw / 2, ch), (c + hw, ch))
-    p.line(W - r, ch).arc(r, r, 1, W, ch + r).line(W, H - ch - r).arc(r, r, 1, W - r, H - ch)
+    p.line(W - r, ch).arc(r, r, 0, W, ch + r).line(W, H - ch - r).arc(r, r, 0, W - r, H - ch)
     p.line(c + hw, H - ch)
     p.cubic((c + hw / 2, H - ch), (c + hw * 0.364, H), (c, H))
     p.cubic((c - hw * 0.364, H), (c - hw / 2, H - ch), (c - hw, H - ch))
-    p.line(r, H - ch).arc(r, r, 1, 0, H - ch - r).line(0, ch + r).arc(r, r, 1, r, ch)
+    p.line(r, H - ch).arc(r, r, 0, 0, H - ch - r).line(0, ch + r).arc(r, r, 0, r, ch)
     return p
 
 
