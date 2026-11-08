@@ -10,6 +10,8 @@ from PIL import ImageFont
 
 # A sign is flagged "shrunk" when its own best fit is smaller than the frozen Set size.
 SHRUNK_EPSILON = 1e-6
+# Distance between baselines of a multi-line sign, as a multiple of the font size.
+LINE_PITCH = 1.2
 
 
 def find_system_fonts() -> List[dict]:
@@ -90,10 +92,11 @@ def calculate_optimal_font_size(
         if not text_strip:
             continue
 
-        # getbbox returns (left, top, right, bottom)
-        bbox = font.getbbox(text_strip)
-        raw_w = bbox[2] - bbox[0]
-        raw_h = bbox[3] - bbox[1]
+        # getbbox returns (left, top, right, bottom); it knows nothing about line breaks
+        lines = [l.strip() for l in text_strip.split("\n")]
+        boxes = [font.getbbox(l) for l in lines if l]
+        raw_w = max(b[2] - b[0] for b in boxes)
+        raw_h = max(b[3] - b[1] for b in boxes) + (len(lines) - 1) * LINE_PITCH * pilot_size
 
         # Convert back to 'ref_size' scale
         text_w = raw_w * (ref_size / pilot_size)

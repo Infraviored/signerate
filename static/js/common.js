@@ -40,6 +40,7 @@
 
   S.ICON_TRASH = ['M3 6h18', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2', 'M10 11v6', 'M14 11v6'];
   S.ICON_CLOSE = ['M18 6L6 18', 'M6 6l12 12'];
+  S.ICON_CHECK = ['M20 6L9 17l-5-5'];
   S.ICON_RENEW = ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5'];
 
   S.debounce = function (fn, ms) {
@@ -117,6 +118,8 @@
 
   // --- Sign preview ---------------------------------------------------------
 
+  const LINE_PITCH = 1.2; // same as fonts.LINE_PITCH on the server
+
   S.guessFontSize = (st) => (st.height - 2 * st.min_margin) * 0.7;
 
   /* Pixels per millimetre so a plate fits inside maxW x maxH. */
@@ -129,14 +132,19 @@
     let x = w / 2, anchor = 'middle';
     if (st.horizontal_align === 'left') { x = m; anchor = 'start'; }
     else if (st.horizontal_align === 'right') { x = w - m; anchor = 'end'; }
-    const label = S.svg('text', {
-      x, y: h / 2, fill: st.text_color, 'font-family': S.fontCss(st.font_path),
-      'font-size': size, 'text-anchor': anchor, 'dominant-baseline': 'central',
+    const lines = String(text).split('\n');
+    const labels = lines.map((line, n) => {
+      const label = S.svg('text', {
+        x, y: h / 2 + (n - (lines.length - 1) / 2) * LINE_PITCH * size,
+        fill: st.text_color, 'font-family': S.fontCss(st.font_path),
+        'font-size': size, 'text-anchor': anchor, 'dominant-baseline': 'central',
+      });
+      label.textContent = line;
+      return label;
     });
-    label.textContent = text;
     return S.svg('svg', { class: 'sign-svg', width: w * scale, height: h * scale, viewBox: `0 0 ${w} ${h}` },
       S.svg('rect', { x: 0, y: 0, width: w, height: h, fill: st.bg_color, rx: 0.8, ry: 0.8 }),
-      label);
+      ...labels);
   };
 
   S.preview = (settings, texts, fontSize) =>

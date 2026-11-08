@@ -285,7 +285,8 @@
   }
 
   function renderActions(r) {
-    const kids = [];
+    const kids = [S.el('button', { class: 'icon-btn row-confirm', type: 'button', title: 'Done', attrs: { 'aria-label': 'Done' },
+      on: { mousedown: (e) => e.preventDefault(), click: () => addInput.focus() } }, S.icon(S.ICON_CHECK))];
     if (r.sign.exported_at) {
       kids.push(S.el('button', { class: 'icon-btn', type: 'button', title: 'Mark as new', attrs: { 'aria-label': `Mark ${r.sign.text} as new` },
         on: { click: () => renewSign(r.sign) } }, S.icon(S.ICON_RENEW)));
@@ -303,13 +304,14 @@
 
   function buildRow(sign) {
     const box = S.el('div', { class: 'plate-slot' });
-    const input = S.el('input', { class: 'sign-input', type: 'text', value: sign.text, maxLength: 200, attrs: { 'aria-label': 'Sign text' } });
+    const input = S.el('textarea', { class: 'sign-input', rows: sign.text.split('\n').length, value: sign.text, maxLength: 200, attrs: { 'aria-label': 'Sign text' } });
     const note = S.el('span', { class: 'row-note' });
     const actions = S.el('div', { class: 'row-actions' });
     const el = S.el('div', { class: 'sign-row', dataset: { id: sign.id } }, box, input, note, actions);
     const r = { sign, el, box, input, note, actions, shrunk: false, size: null, moved: false };
 
     input.addEventListener('input', () => {
+      input.rows = input.value.split('\n').length;
       const v = input.value.trim();
       el.classList.toggle('editing-empty', !v);
       if (!v) return; // an empty sign is never saved; blur restores the old text
@@ -334,11 +336,9 @@
       if (r.moved) setTimeout(renderList, 150); // after a click on another row has landed
     });
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.isComposing) {
-        if (sign.fresh) addInput.focus();
-        else input.blur();
-      }
-      if (e.key === 'Escape') { input.value = sign.text; input.blur(); }
+      // Plain Enter is a line break; the check mark or a click elsewhere confirms.
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addInput.focus();
+      if (e.key === 'Escape') { input.value = sign.text; input.rows = sign.text.split('\n').length; input.blur(); }
     });
 
     renderActions(r);

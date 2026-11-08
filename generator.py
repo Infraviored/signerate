@@ -5,6 +5,7 @@ from typing import List, Tuple, Callable
 import cadquery as cq
 from cadquery import Color, Location, Vector
 from exporter_3mf import save_3mf
+from fonts import LINE_PITCH
 
 
 def hex_to_hex(hex_color: str) -> str:
@@ -20,6 +21,29 @@ def hex_to_rgb_float(hex_color: str) -> Tuple[float, float, float]:
         raise ValueError(f"Ungültige Farbe: {hex_color}")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return r / 255.0, g / 255.0, b / 255.0
+
+
+def _text_block(text: str, font_size: float, distance: float, font_path: str, align: str):
+    """Extruded text as a Workplane. Several lines are stacked with LINE_PITCH and
+    lined up with each other according to `align`."""
+    def line_wp(line):
+        return cq.Workplane("XY").text(line, fontsize=font_size, distance=distance, fontPath=font_path,
+                                       halign="center", valign="center")
+
+    lines = [l.strip() for l in text.split("\n")]
+    if len(lines) == 1:
+        return line_wp(lines[0])
+
+    shapes = []
+    for n, line in enumerate(lines):
+        if not line:
+            continue
+        shape = line_wp(line).val()
+        bb = shape.BoundingBox()
+        dx = -bb.xmin if align == "left" else -bb.xmax if align == "right" else -(bb.xmin + bb.xmax) / 2
+        dy = ((len(lines) - 1) / 2 - n) * LINE_PITCH * font_size
+        shapes.append(shape.moved(cq.Location(cq.Vector(dx, dy, 0))))
+    return cq.Workplane("XY").newObject([cq.Compound.makeCompound(shapes)])
 
 
 def _safe_name(text: str, max_len: int = 48) -> str:
@@ -137,11 +161,7 @@ def generate_signs(
         # 1. Generate Letter Solid (Temporary for bounding box)
         text_align = settings.get("horizontal_align", "center").lower()
         
-        letters_raw = (
-            cq.Workplane("XY")
-            .text(text, fontsize=font_size, distance=text_h, fontPath=font_path,
-                  halign="center", valign="center")
-        )
+        letters_raw = _text_block(text, font_size, text_h, font_path, text_align)
         # We use a temporary object to find the GEOMETRIC center
         bb = letters_raw.val().BoundingBox()
         
@@ -177,11 +197,7 @@ def generate_signs(
         pocket_depth = base_h - text_z_bottom
         
         if pocket_depth > 0.001:
-            pocket_raw = (
-                cq.Workplane("XY")
-                .text(text, fontsize=font_size, distance=pocket_depth + top_opening_overshoot,
-                      fontPath=font_path, halign="center", valign="center")
-            )
+            pocket_raw = _text_block(text, font_size, pocket_depth + top_opening_overshoot, font_path, text_align)
             pocket_shape = (
                 pocket_raw
                 .translate((h_offset, v_offset, text_z_bottom))

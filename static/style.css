@@ -182,6 +182,7 @@ a { color: inherit; }
   background: transparent;
   padding: .3rem .2rem;
   font-size: 1.15rem; font-weight: 500;
+  display: block; resize: none; overflow: hidden; field-sizing: content;
 }
 .sign-input:hover { border-bottom-color: var(--line); }
 .sign-input:focus { outline: 0; border-bottom: 2px solid var(--ink); padding-bottom: calc(.3rem - 1px); }
@@ -213,7 +214,9 @@ a { color: inherit; }
 .group-count { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .row-note { color: var(--red); font-size: .9rem; white-space: nowrap; }
-.row-actions { display: flex; gap: .15rem; min-width: 4.15rem; justify-content: flex-end; }
+.row-actions { display: flex; gap: .15rem; min-width: 6.3rem; justify-content: flex-end; }
+.row-confirm { visibility: hidden; color: var(--ink); background: var(--signal); }
+.sign-row:focus-within .row-confirm { visibility: visible; }
 @media (hover: hover) {
   .row-actions { opacity: 0; }
   .sign-row:hover .row-actions, .sign-row:focus-within .row-actions { opacity: 1; }
