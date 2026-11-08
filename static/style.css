@@ -35,7 +35,7 @@ a { color: inherit; }
 .topbar :focus-visible, .export-bar :focus-visible { outline-color: var(--signal); }
 
 .muted { color: var(--muted); }
-.sign-svg { display: block; flex: none; filter: drop-shadow(0 1px 1px rgb(27 32 35 / .45)); }
+.sign-svg { display: block; flex: none; filter: drop-shadow(0 0 1px rgb(27 32 35 / .7)) drop-shadow(0 3px 5px rgb(27 32 35 / .65)); }
 
 /* --- Buttons ------------------------------------------------------------ */
 .btn {
@@ -143,7 +143,7 @@ a { color: inherit; }
 .shelf-signs {
   display: flex; align-items: flex-end; gap: .75rem;
   overflow: hidden;
-  padding-bottom: 2px;
+  padding: 6px 6px 10px;
   border-bottom: 7px solid var(--anthracite);
   box-shadow: 0 9px 10px -6px rgb(27 32 35 / .4);
 }
