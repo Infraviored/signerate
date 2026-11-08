@@ -1,49 +1,47 @@
 {% extends "base.html" %}
-{% block title %}Sign Sets - Signerate{% endblock %}
+{% block title %}Sign sets - Signerate{% endblock %}
 {% block body %}
-<main class="overview">
-  <div class="overview-head">
-    <h1>Sign Sets</h1>
-    <button class="btn btn-primary" id="new-set-btn" type="button">+ New Set</button>
-  </div>
-  <div class="set-grid" id="set-grid"></div>
-</main>
+<header class="topbar">
+  <h1 class="wordmark">Signerate</h1>
+  <button class="btn btn-signal" id="new-set-btn" type="button">New set</button>
+</header>
+<main class="shelves" id="set-grid"></main>
 
 <dialog id="wizard">
   <div id="wizard-step1">
-    <h2>New Set: starting point</h2>
+    <h2>Start from</h2>
     <div class="wizard-options" id="wizard-options"></div>
     <label class="check-row" id="copy-signs-row" hidden>
-      <input type="checkbox" id="copy-signs"> Also copy its signs
+      <input type="checkbox" id="copy-signs"> Copy its signs too
     </label>
     <div class="dialog-actions">
-      <button class="btn btn-secondary" type="button" data-close>Cancel</button>
-      <button class="btn btn-primary" type="button" id="wizard-next">Next</button>
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn btn-ink" type="button" id="wizard-next">Next</button>
     </div>
   </div>
   <div id="wizard-step2" hidden>
-    <h2>New Set: name and style</h2>
-    <div class="field-group">
-      <div class="label-wrapper"><label for="wizard-name">Name</label></div>
+    <h2>Name and size</h2>
+    <div class="field">
+      <label for="wizard-name">Name</label>
       <input type="text" id="wizard-name" maxlength="60" autocomplete="off">
       <div class="field-error" id="wizard-name-error"></div>
     </div>
-    <div class="preview-box wizard-preview" id="wizard-preview"></div>
+    <div class="wizard-preview" id="wizard-preview"></div>
     <div id="wizard-form"></div>
     <div class="dialog-actions">
-      <button class="btn btn-secondary spacer" type="button" id="wizard-back">Back</button>
-      <button class="btn btn-secondary" type="button" data-close>Cancel</button>
-      <button class="btn btn-primary" type="button" id="wizard-create">Create</button>
+      <button class="btn push-left" type="button" id="wizard-back">Back</button>
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn btn-ink" type="button" id="wizard-create">Create set</button>
     </div>
   </div>
 </dialog>
 
 <dialog id="delete-dialog">
-  <h2>Delete this Set?</h2>
+  <h2>Delete this set?</h2>
   <p id="delete-text" class="muted"></p>
   <div class="dialog-actions">
-    <button class="btn btn-secondary" type="button" data-close>Cancel</button>
-    <button class="btn btn-danger" type="button" id="delete-confirm">Delete</button>
+    <button class="btn" type="button" data-close>Cancel</button>
+    <button class="btn btn-danger" type="button" id="delete-confirm">Delete set</button>
   </div>
 </dialog>
 {% endblock %}

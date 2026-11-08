@@ -32,6 +32,7 @@ MAX_SIGNS = 2000
 SETTING_KEYS = (
     "width", "height", "min_margin", "base_thickness", "text_thickness",
     "text_protrusion", "bg_color", "text_color", "font_path", "horizontal_align",
+    "text_size",
 )
 
 BUILTIN_DEFAULTS = {
@@ -45,6 +46,7 @@ BUILTIN_DEFAULTS = {
     "text_color": "#ffffff",
     "font_path": "",
     "horizontal_align": "center",
+    "text_size": None,  # None = fit the plate; a number = fixed size in mm
 }
 
 LOCK = threading.RLock()
@@ -176,6 +178,10 @@ def validate_settings(raw, base):
         raise ApiError("font_path must be text.")
     if s["horizontal_align"] not in ("left", "center", "right"):
         raise ApiError("horizontal_align must be left, center or right.")
+    if s["text_size"] is not None:
+        s["text_size"] = _number(s["text_size"], "text_size")
+        if s["text_size"] <= 0 or s["text_size"] > 2000:
+            raise ApiError("text_size must be greater than 0 (and at most 2000).")
     check_geometry(s)
     return s
 
@@ -353,10 +359,16 @@ def init_sets():
 
 # --- Queries -----------------------------------------------------------------
 
+def size_limit(settings, frozen):
+    """The size signs are capped at: a user-fixed size wins over the frozen one."""
+    return settings.get("text_size") or frozen or None
+
+
 def set_font_size(data):
-    """The Set's current font size: frozen value, else the optimum across all signs."""
-    if data.get("font_size"):
-        return data["font_size"]
+    """The Set's current font size: fixed size, frozen value, else the optimum across all signs."""
+    limit = size_limit(data["settings"], data.get("font_size"))
+    if limit:
+        return limit
     return _optimum_for([s["text"] for s in data["signs"]], data["settings"])
 
 
@@ -370,6 +382,7 @@ def summarize(data):
         "sign_count": len(signs),
         "new_count": sum(1 for s in signs if not s.get("exported_at")),
         "preview_text": signs[0]["text"] if signs else data["name"],
+        "preview_texts": [s["text"] for s in signs[:12]],
     }
 
 
@@ -543,6 +556,7 @@ def preview(raw_settings, texts, frozen=None):
         raise ApiError(f"Font file not found: {font_path}")
     aw = settings["width"] - 2 * settings["min_margin"]
     ah = settings["height"] - 2 * settings["min_margin"]
+    frozen = size_limit(settings, frozen)
     plan = fonts.plan_sizes(texts, font_path, aw, ah, frozen)
     r = lambda v: None if v is None else round(v, 3)
     return {
@@ -591,7 +605,9 @@ def run_export(name, scope, fmt, output_path, generate, progress=None):
     aw = settings["width"] - 2 * settings["min_margin"]
     ah = settings["height"] - 2 * settings["min_margin"]
     # Sizes are planned over ALL signs so a partial export matches earlier prints.
-    plan = fonts.plan_sizes([s["text"] for s in signs], font_path, aw, ah, snap.get("font_size"))
+    plan = fonts.plan_sizes(
+        [s["text"] for s in signs], font_path, aw, ah, size_limit(settings, snap.get("font_size"))
+    )
 
     texts = [s["text"] for _, s in selected]
     sizes = [plan["sizes"][i] for i, _ in selected]
@@ -607,7 +623,7 @@ def run_export(name, scope, fmt, output_path, generate, progress=None):
         for s in cur["signs"]:
             if exported_ids.get(s["id"]) == s["text"]:
                 s["exported_at"] = now
-        if not cur.get("font_size"):
+        if not cur.get("font_size") and not settings.get("text_size"):
             cur["font_size"] = plan["set_size"]
         cur["exported_settings"] = dict(settings)
         cur["exports"].append({"at": now, "format": fmt, "scope": scope, "count": len(selected)})

@@ -2,64 +2,62 @@
 {% block title %}{{ name }} - Signerate{% endblock %}
 {% block body %}
 <div class="editor" id="editor" data-set-name="{{ name }}">
-  <header class="editor-header">
-    <a class="back-link" href="/">&larr; Sign Sets</a>
+  <header class="topbar">
+    <a class="back-link" href="/">All sets</a>
     <div class="set-name-wrap">
       <input type="text" class="set-name-input" id="set-name" maxlength="60" autocomplete="off" aria-label="Set name">
       <div class="name-error" id="name-error" hidden></div>
     </div>
-    <div class="summary">
-      <span class="swatch" id="swatch-bg"></span>
-      <span class="swatch" id="swatch-text"></span>
-      <span class="summary-text" id="summary"></span>
-    </div>
+    <span class="summary" id="summary"></span>
     <span class="save-state" id="save-state"></span>
-    <button class="btn btn-secondary btn-small" type="button" id="open-panel">Dimensions &amp; Style</button>
+    <button class="btn btn-on-dark" type="button" id="open-panel" aria-pressed="false">Size &amp; style</button>
   </header>
 
-  <div class="banner danger" id="thickness-banner" hidden></div>
-  <div class="banner" id="changed-banner" hidden>
-    <span>Dimensions or style changed since the last export.</span>
-    <button class="btn btn-secondary btn-small" type="button" id="changed-renew">Mark all as new</button>
-  </div>
-
-  <div class="add-row">
-    <input type="text" id="add-input" placeholder="Add a sign, press Enter" autocomplete="off" maxlength="200" aria-label="Add a sign">
-  </div>
-
-  <div class="list-head"><span id="list-title">Signs (0)</span></div>
-  <div class="sign-list" id="sign-list"></div>
-
-  <footer class="export-bar">
-    <div class="export-controls">
-      <div class="segmented" id="scope" role="group" aria-label="Export scope">
-        <button type="button" data-scope="new"></button>
-        <button type="button" data-scope="all"></button>
+  <div class="workbench">
+    <div class="workspace" id="workspace">
+      <div class="banner danger" id="thickness-banner" hidden></div>
+      <div class="banner" id="changed-banner" hidden>
+        <span>Size or style changed since the last export.</span>
+        <button class="btn" type="button" id="changed-renew">Mark all as new</button>
       </div>
-      <select id="format" aria-label="Format">
-        <option value="3mf">3MF</option>
-        <option value="step">STEP</option>
-      </select>
-      <span class="export-note" id="export-note"></span>
-      <button class="btn btn-success" type="button" id="export-btn"></button>
-    </div>
-    <div class="progress" id="progress" hidden><div class="progress-bar" id="progress-bar"></div></div>
-    <div class="export-status" id="export-status" hidden></div>
-  </footer>
-</div>
 
-<div class="backdrop" id="backdrop"></div>
-<aside class="panel" id="panel" aria-label="Dimensions and style">
-  <div class="panel-head">
-    <h2>Dimensions &amp; Style</h2>
-    <button class="icon-btn" type="button" id="close-panel" aria-label="Close"></button>
+      <div class="sign-row add-row">
+        <div class="plate-slot" id="add-preview"></div>
+        <input type="text" class="sign-input" id="add-input" placeholder="Type a new sign" autocomplete="off" maxlength="200" aria-label="Type a new sign">
+      </div>
+
+      <div class="tray" id="sign-list"></div>
+
+      <footer class="export-bar">
+        <div class="progress" id="progress" hidden><div class="progress-bar" id="progress-bar"></div></div>
+        <div class="export-controls">
+          <div class="segmented" id="scope" role="group" aria-label="Which signs to export">
+            <button type="button" data-scope="new"></button>
+            <button type="button" data-scope="all"></button>
+          </div>
+          <div class="segmented" id="format" role="group" aria-label="File format">
+            <button type="button" data-format="3mf" title="For Bambu and Prusa slicers">3MF</button>
+            <button type="button" data-format="step" title="For CAD editing">STEP</button>
+          </div>
+          <div class="export-status" id="export-status" hidden></div>
+          <button class="btn btn-signal btn-export" type="button" id="export-btn"></button>
+        </div>
+      </footer>
+    </div>
+
+    <aside class="panel" id="panel" aria-label="Size and style" hidden>
+      <div class="panel-head">
+        <h2>Size &amp; style</h2>
+        <button class="icon-btn" type="button" id="close-panel" aria-label="Close"></button>
+      </div>
+      <div class="panel-body">
+        <div id="panel-form"></div>
+        <h3 class="form-section">Current text size</h3>
+        <div class="stats" id="stats"></div>
+      </div>
+    </aside>
   </div>
-  <div class="panel-body">
-    <div id="panel-form"></div>
-    <div class="form-section">Font size</div>
-    <div class="stats" id="stats"></div>
-  </div>
-</aside>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/editor.js') }}"></script>

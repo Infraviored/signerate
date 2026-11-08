@@ -21,41 +21,60 @@
 
   // --- Overview -------------------------------------------------------------
 
-  function card(set) {
+  const shelfScale = (st) => S.plateScale(st, 240, 90);
+  const facts = (set) => {
     const st = set.settings;
-    const meta = S.el('div', { class: 'set-card-meta' },
-      `${S.num(st.width)}×${S.num(st.height)} mm · ${set.sign_count} ${set.sign_count === 1 ? 'sign' : 'signs'} · `,
-      S.el('span', { class: set.new_count ? 'new-count' : '', text: `${set.new_count} new` }));
-    const preview = S.el('div', { class: 'preview-box' });
-    preview.append(S.signSvg(st, set.preview_text, set.font_size));
+    return `${S.num(st.width)} × ${S.num(st.height)} mm, ${set.sign_count} ${set.sign_count === 1 ? 'sign' : 'signs'}`;
+  };
 
-    return S.el('div', { class: 'set-card' },
-      preview,
-      S.el('div', {},
-        S.el('a', { class: 'set-card-name', href: S.editorUrl(set.name), text: set.name }),
-        meta),
-      S.el('div', { class: 'set-card-actions' },
-        S.el('button', { class: 'btn btn-secondary btn-small', type: 'button', text: 'Duplicate as new Set…',
-          on: { click: () => openWizard(set.name) } }),
-        S.el('button', { class: 'icon-btn danger', type: 'button', title: 'Delete Set', attrs: { 'aria-label': `Delete ${set.name}` },
-          on: { click: () => askDelete(set) } }, S.icon(S.ICON_TRASH))));
+  function shelf(set) {
+    const st = set.settings;
+    const scale = shelfScale(st);
+    const plates = S.el('div', { class: 'shelf-signs' });
+    if (set.previews.length) {
+      for (const p of set.previews) plates.append(S.signSvg(st, p.text, p.font_size, scale));
+    } else {
+      plates.append(S.signSvg(st, '', null, scale));
+    }
+    return S.el('section', { class: 'shelf' },
+      S.el('div', { class: 'shelf-head' },
+        S.el('h2', {}, S.el('a', { class: 'shelf-name', href: S.editorUrl(set.name), text: set.name })),
+        S.el('span', { class: 'shelf-facts', text: facts(set) }),
+        set.new_count ? S.el('span', { class: 'tag-new', text: `${set.new_count} new` }) : null,
+        S.el('div', { class: 'shelf-actions' },
+          S.el('button', { class: 'btn', type: 'button', text: 'Duplicate', on: { click: () => openWizard(set.name) } }),
+          S.el('button', { class: 'icon-btn danger', type: 'button', title: 'Delete', attrs: { 'aria-label': `Delete ${set.name}` },
+            on: { click: () => askDelete(set) } }, S.icon(S.ICON_TRASH)))),
+      plates);
   }
 
   function render() {
     grid.replaceChildren();
     if (!sets.length) {
-      grid.append(S.el('div', { class: 'empty-state', text: 'No Sets yet. Create your first one with "+ New Set".' }));
+      grid.append(S.el('div', { class: 'empty-state', text: 'No sets yet. Create your first one with New set.' }));
       return;
     }
-    for (const set of sets) grid.append(card(set));
+    for (const set of sets) grid.append(shelf(set));
+  }
+
+  /* Sizes come from the same server function as the editor and the export. */
+  async function loadPreviews(set) {
+    const texts = set.preview_texts || [];
+    set.previews = texts.map((text) => ({ text, font_size: set.font_size }));
+    if (!texts.length) return;
+    try {
+      const res = await S.preview(set.settings, texts, set.font_size);
+      set.previews = res.signs;
+    } catch (e) { /* keep the set's own size */ }
   }
 
   async function refresh() {
     try {
       sets = await S.api('GET', '/api/sets');
+      await Promise.all(sets.map(loadPreviews));
       render();
     } catch (e) {
-      grid.replaceChildren(S.el('div', { class: 'empty-state', text: 'Could not load Sets: ' + e.message }));
+      grid.replaceChildren(S.el('div', { class: 'empty-state', text: 'Could not load sets: ' + e.message }));
     }
   }
 
@@ -99,11 +118,10 @@
       chosen = value || null;
       copyRow.hidden = !chosen;
     });
-    const box = S.el('div', { class: 'preview-box' });
-    if (set) box.append(S.signSvg(set.settings, set.preview_text, set.font_size));
+    const first = set && set.previews[0];
     return S.el('label', { class: 'wizard-option' }, radio,
-      set ? box : null,
-      S.el('span', { class: 'option-text' }, title, S.el('small', { text: sub })));
+      S.el('span', { class: 'option-text' }, title, S.el('small', { text: sub })),
+      set ? S.signSvg(set.settings, first ? first.text : '', first ? first.font_size : null, S.plateScale(set.settings, 150, 44)) : null);
   }
 
   function openWizard(preselect) {
@@ -111,9 +129,8 @@
     $('copy-signs').checked = false;
     copyRow.hidden = !chosen;
     optionsBox.replaceChildren(
-      option('', 'Blank', 'Default dimensions and style', null),
-      ...sets.map((s) => option(s.name, s.name,
-        `${S.num(s.settings.width)}×${S.num(s.settings.height)} mm · ${s.sign_count} signs`, s)));
+      option('', 'Blank', 'Default size and style', null),
+      ...sets.map((s) => option(s.name, s.name, facts(s), s)));
     showStep(1);
     $('wizard-create').disabled = false;
     nameInput.value = '';
@@ -132,7 +149,7 @@
     if (Object.keys(S.checkSettings(st)).length) return;
     try {
       const res = await S.preview(st, ['Sample']);
-      $('wizard-preview').replaceChildren(S.signSvg(st, 'Sample', res.font_size));
+      $('wizard-preview').replaceChildren(S.signSvg(st, 'Sample', res.font_size, S.plateScale(st, 420, 100)));
     } catch (e) {
       $('wizard-preview').replaceChildren(S.el('span', { class: 'muted', text: e.message }));
     }
@@ -166,7 +183,7 @@
     const name = nameInput.value.trim();
     if (!name) { nameError.textContent = 'Please enter a name.'; nameInput.focus(); return; }
     if (sets.some((s) => s.name.toLowerCase() === name.toLowerCase())) {
-      nameError.textContent = 'A Set with this name already exists.';
+      nameError.textContent = 'A set with this name already exists.';
       nameInput.focus();
       return;
     }

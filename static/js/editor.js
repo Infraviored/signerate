@@ -5,11 +5,13 @@
   const $ = (id) => document.getElementById(id);
 
   const SETTING_KEYS = ['width', 'height', 'min_margin', 'base_thickness', 'text_thickness',
-    'text_protrusion', 'bg_color', 'text_color', 'font_path', 'horizontal_align'];
+    'text_protrusion', 'bg_color', 'text_color', 'font_path', 'horizontal_align', 'text_size'];
+  const PANEL_KEY = 'signerate.panelOpen';
 
   const state = {
     name: $('editor').dataset.setName,
-    scope: 'new',        // "New only" every time the page loads
+    scope: 'new',        // "New" every time the page loads
+    format: '3mf',
     dirty: false,
     formInvalid: false,
     busy: false,         // an export is running
@@ -18,7 +20,8 @@
     previewError: '',
   };
   let set = null;
-  const rows = new Map(); // sign id -> {sign, el, box, input, meta, shrunk, size}
+  let scale = 1;
+  const rows = new Map(); // sign id -> {sign, el, box, input, note, actions, shrunk, size}
 
   const list = $('sign-list');
   const addInput = $('add-input');
@@ -43,12 +46,12 @@
   try {
     set = await S.api('GET', S.setUrl(state.name));
   } catch (e) {
-    document.body.replaceChildren(S.el('p', { class: 'empty-state', text: 'Could not load this Set: ' + e.message }));
+    document.body.replaceChildren(S.el('p', { class: 'empty-state', text: 'Could not load this set: ' + e.message }));
     return;
   }
   $('close-panel').append(S.icon(S.ICON_CLOSE));
 
-  const form = S.SettingsForm(set.settings, onSettingsChange);
+  const form = S.SettingsForm(set.settings, onSettingsChange, () => state.preview && state.preview.font_size);
   $('panel-form').append(form.el);
 
   // --- Helpers --------------------------------------------------------------
@@ -60,11 +63,16 @@
 
   const newSigns = () => set.signs.filter((s) => !s.exported_at);
   const scopeCount = () => (state.scope === 'new' ? newSigns().length : set.signs.length);
+  const plural = (n) => `${n} ${n === 1 ? 'sign' : 'signs'}`;
 
   function sameSettings(a, b) {
-    return SETTING_KEYS.every((k) => (typeof a[k] === 'number' || typeof b[k] === 'number')
-      ? Number(a[k]) === Number(b[k])
-      : String(a[k]).toLowerCase() === String(b[k]).toLowerCase());
+    return SETTING_KEYS.every((k) => {
+      const x = a[k] === undefined ? null : a[k];
+      const y = b[k] === undefined ? null : b[k];
+      return (typeof x === 'number' && typeof y === 'number')
+        ? x === y
+        : String(x).toLowerCase() === String(y).toLowerCase();
+    });
   }
 
   /* Takes the server's view of timestamps, frozen size etc. without touching texts. */
@@ -91,7 +99,7 @@
   function setSaveState(kind, message) {
     saveState.className = 'save-state' + (kind === 'error' ? ' error' : '');
     saveState.title = message || '';
-    saveState.textContent = { saving: 'Saving…', saved: 'Saved', error: message || 'Not saved', '': '' }[kind];
+    saveState.textContent = { saving: 'Saving', saved: 'Saved', error: message || 'Not saved', '': '' }[kind];
   }
 
   function payload() {
@@ -109,11 +117,10 @@
       const data = await S.api('PUT', S.setUrl(state.name), payload());
       mergeServerMeta(data);
       if (!state.dirty) setSaveState('saved');
-      refreshRowMeta();
       updateChrome();
     } catch (e) {
       state.dirty = true;
-      setSaveState('error', 'Save failed: ' + e.message + ' (click to retry)');
+      setSaveState('error', 'Not saved: ' + e.message + ' Click to retry.');
       if (!e.status || e.status >= 500) {
         clearTimeout(retryTimer);
         retryTimer = setTimeout(() => flush().catch(() => {}), 5000);
@@ -171,25 +178,34 @@
     }
     applyPreview();
   }
-  const schedulePreview = S.debounce(runPreview, 150);
+  const schedulePreview = S.debounce(runPreview, 120);
+
+  function drawRow(r) {
+    r.box.replaceChildren(S.signSvg(set.settings, r.sign.text, r.size, scale));
+  }
 
   function applyPreview() {
+    const st = set.settings;
+    const room = $('workspace').clientWidth;
+    const narrow = window.matchMedia('(max-width: 720px)').matches;
+    scale = S.plateScale(st, narrow ? room - 32 : 300, narrow ? 140 : 100);
+    $('workspace').style.setProperty('--plate-w', `${st.width * scale}px`);
+
     const p = state.preview;
-    const face = S.fontCss(set.settings.font_path);
     if (p) {
       p.ids.forEach((id, i) => {
         const r = rows.get(id);
         if (!r) return;
         r.size = p.signs[i].font_size;
         r.shrunk = p.signs[i].shrunk;
-        r.el.classList.toggle('limiting', !!p.limiting_text && r.sign.text === p.limiting_text);
       });
     }
     for (const r of rows.values()) {
-      r.input.style.fontFamily = face;
-      r.box.replaceChildren(S.signSvg(set.settings, r.sign.text, r.size));
-      renderMeta(r);
+      if (!r.size && p) r.size = p.font_size;
+      drawRow(r);
+      renderNote(r);
     }
+    $('add-preview').replaceChildren(S.signSvg(st, '', null, scale));
     renderStats();
   }
 
@@ -198,69 +214,64 @@
   function updateChrome() {
     const st = set.settings;
     $('summary').textContent = S.summaryText(st);
-    $('swatch-bg').style.backgroundColor = st.bg_color;
-    $('swatch-text').style.backgroundColor = st.text_color;
 
     const warn = S.thicknessWarning(st);
     const tb = $('thickness-banner');
-    tb.hidden = !warn;
-    if (warn) {
-      tb.classList.toggle('danger', warn.level === 'danger');
-      tb.textContent = `${warn.title}: ${warn.detail}`;
-    }
+    tb.hidden = !(warn && warn.level === 'danger');
+    if (warn) tb.textContent = warn.text;
     $('changed-banner').hidden = !(set.exported_settings && !sameSettings(st, set.exported_settings));
 
-    $('list-title').textContent = `Signs (${set.signs.length})`;
     updateExportBar();
     renderStats();
   }
 
   function renderStats() {
-    const box = $('stats');
     const p = state.preview;
+    const st = set.settings;
     const kids = [];
     if (state.previewError) {
-      kids.push(S.el('div', { class: 'limit', text: 'Preview unavailable: ' + state.previewError }));
+      kids.push(S.el('div', { class: 'limit', text: 'No preview: ' + state.previewError }));
     } else if (!p || p.font_size === null) {
-      kids.push(S.el('div', { text: 'Add a sign to see the font size.' }));
+      kids.push(S.el('div', { text: 'Add a sign to see the text size.' }));
     } else {
-      const locked = set.font_size !== null;
-      kids.push(S.el('div', {}, 'Set font size: ', S.el('strong', { text: `${p.font_size.toFixed(2)} mm` })));
-      kids.push(S.el('div', { text: locked
-        ? 'Locked since the first export, so later exports match the printed signs.'
-        : 'Automatic until the first export, then it is locked.' }));
-      if (p.limiting_text) {
-        kids.push(S.el('div', {}, 'Limited by: ', S.el('span', { class: 'limit', text: `"${p.limiting_text}"` })));
-      }
-      if (locked && p.optimum !== null && p.optimum < p.font_size) {
-        kids.push(S.el('div', { text: `Best fit for all signs now would be ${p.optimum.toFixed(2)} mm.` }));
+      kids.push(S.el('div', { class: 'stat-size', text: `${p.font_size.toFixed(2)} mm` }));
+      if (st.text_size) {
+        kids.push(S.el('div', { text: 'Fixed by you.' }));
+      } else if (set.font_size !== null) {
+        kids.push(S.el('div', { text: 'Locked at the first export, so new signs match the ones already printed.' }));
+      } else if (p.limiting_text) {
+        kids.push(S.el('div', { text: `Set by the longest sign, "${p.limiting_text}".` }));
+      } else {
+        kids.push(S.el('div', { text: 'Set by the plate height.' }));
       }
       const shrunk = p.signs.filter((s) => s.shrunk).length;
-      if (shrunk) kids.push(S.el('div', { class: 'limit', text: `${shrunk} ${shrunk === 1 ? 'sign is' : 'signs are'} shrunk to fit.` }));
+      if (shrunk) kids.push(S.el('div', { class: 'limit', text: `${plural(shrunk)} shrunk to fit.` }));
     }
-    const warn = S.thicknessWarning(set.settings);
-    if (warn) kids.push(S.el('div', { class: 'limit', text: `${warn.title}: ${warn.detail}` }));
-    box.replaceChildren(...kids);
+    const warn = S.thicknessWarning(st);
+    if (warn) kids.push(S.el('div', { class: 'limit', text: warn.text }));
+    $('stats').replaceChildren(...kids);
   }
 
   function openPanel(open) {
-    $('panel').classList.toggle('open', open);
-    $('backdrop').classList.toggle('show', open);
+    $('panel').hidden = !open;
+    $('open-panel').setAttribute('aria-pressed', String(open));
+    try { localStorage.setItem(PANEL_KEY, open ? '1' : '0'); } catch (e) { /* private mode */ }
+    applyPreview();
   }
-  $('open-panel').addEventListener('click', () => openPanel(true));
+  $('open-panel').addEventListener('click', () => openPanel($('panel').hidden));
   $('close-panel').addEventListener('click', () => openPanel(false));
-  $('backdrop').addEventListener('click', () => openPanel(false));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') openPanel(false); });
+  window.addEventListener('resize', S.debounce(applyPreview, 100));
 
   function onSettingsChange(values, valid) {
     state.formInvalid = !valid;
     if (!valid) {
-      setSaveState('error', 'Not saved: fix the highlighted fields');
+      setSaveState('error', 'Not saved: fix the highlighted field');
       return;
     }
     set.settings = { ...set.settings, ...values };
     scheduleSave();
     updateChrome();
+    applyPreview();
     schedulePreview();
   }
 
@@ -268,81 +279,120 @@
 
   // --- Rows -----------------------------------------------------------------
 
-  function renderMeta(r) {
-    const { sign } = r;
+  function renderNote(r) {
+    r.note.textContent = r.shrunk ? 'Shrunk to fit' : '';
+    r.note.title = r.shrunk ? `Too long for the set's text size. Printed at ${r.size} mm.` : '';
+  }
+
+  function renderActions(r) {
     const kids = [];
-    kids.push(sign.exported_at
-      ? S.el('span', { class: 'badge badge-exported', text: `exported ${S.shortDate(sign.exported_at)}` })
-      : S.el('span', { class: 'badge badge-new', text: 'NEW' }));
-    if (r.shrunk) {
-      const target = state.preview ? state.preview.font_size : '?';
-      kids.push(S.el('span', { class: 'badge badge-shrunk', text: 'shrunk',
-        title: `Does not fit at the Set font size (${target} mm). It is printed smaller (${r.size} mm).` }));
+    if (r.sign.exported_at) {
+      kids.push(S.el('button', { class: 'icon-btn', type: 'button', title: 'Mark as new', attrs: { 'aria-label': `Mark ${r.sign.text} as new` },
+        on: { click: () => renewSign(r.sign) } }, S.icon(S.ICON_RENEW)));
     }
-    if (sign.exported_at) {
-      kids.push(S.el('button', { class: 'link-btn', type: 'button', text: 'Mark as new',
-        on: { click: () => renewSign(sign) } }));
-    }
-    r.meta.replaceChildren(...kids);
+    kids.push(S.el('button', { class: 'icon-btn danger', type: 'button', title: 'Delete', attrs: { 'aria-label': `Delete ${r.sign.text}` },
+      on: { click: () => deleteSign(r.sign) } }, S.icon(S.ICON_TRASH)));
+    r.actions.replaceChildren(...kids);
   }
 
-  function refreshRowMeta() {
-    for (const r of rows.values()) renderMeta(r);
-    applyScopeDim();
-  }
-
-  function applyScopeDim() {
-    for (const r of rows.values()) r.el.classList.toggle('dim', state.scope === 'new' && !!r.sign.exported_at);
+  function applyScope() {
+    for (const r of rows.values()) {
+      r.el.classList.toggle('included', state.scope === 'all' || !r.sign.exported_at);
+    }
   }
 
   function buildRow(sign) {
-    const box = S.el('div', { class: 'preview-box' });
-    const meta = S.el('div', { class: 'row-meta' });
-    const input = S.el('input', { type: 'text', value: sign.text, maxLength: 200, attrs: { 'aria-label': 'Sign text' } });
-    const del = S.el('button', { class: 'icon-btn danger', type: 'button', title: 'Delete sign', attrs: { 'aria-label': 'Delete sign' },
-      on: { click: () => deleteSign(sign) } }, S.icon(S.ICON_TRASH));
-    const el = S.el('div', { class: 'sign-row' }, box, input, meta, del);
-    const r = { sign, el, box, input, meta, shrunk: false, size: null };
+    const box = S.el('div', { class: 'plate-slot' });
+    const input = S.el('input', { class: 'sign-input', type: 'text', value: sign.text, maxLength: 200, attrs: { 'aria-label': 'Sign text' } });
+    const note = S.el('span', { class: 'row-note' });
+    const actions = S.el('div', { class: 'row-actions' });
+    const el = S.el('div', { class: 'sign-row', dataset: { id: sign.id } }, box, input, note, actions);
+    const r = { sign, el, box, input, note, actions, shrunk: false, size: null, moved: false };
 
     input.addEventListener('input', () => {
       const v = input.value.trim();
       el.classList.toggle('editing-empty', !v);
       if (!v) return; // an empty sign is never saved; blur restores the old text
       sign.text = v;
-      if (sign.exported_at) sign.exported_at = null; // changed after printing
-      renderMeta(r);
-      applyScopeDim();
+      if (sign.exported_at) { // changed after printing; it moves to New when editing ends
+        sign.exported_at = null;
+        r.moved = true;
+        applyScope();
+      }
+      drawRow(r);
       scheduleSave();
       updateChrome();
       schedulePreview();
     });
     input.addEventListener('blur', () => {
       if (!input.value.trim()) {
+        if (sign.fresh) { removeSign(sign); return; }
         input.value = sign.text;
         el.classList.remove('editing-empty');
       }
+      sign.fresh = false;
+      if (r.moved) setTimeout(renderList, 150); // after a click on another row has landed
     });
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') input.blur();
+      if (e.key === 'Enter' && !e.isComposing) {
+        if (sign.fresh) addInput.focus();
+        else input.blur();
+      }
       if (e.key === 'Escape') { input.value = sign.text; input.blur(); }
     });
 
+    renderActions(r);
     rows.set(sign.id, r);
     return r;
   }
 
+  function groupHead(title, count) {
+    return S.el('h3', { class: 'group-head' }, S.el('span', { text: title }), S.el('span', { class: 'group-count', text: String(count) }));
+  }
+
+  /* New signs first, then one group per export day, newest first. */
   function renderList() {
     const top = list.scrollTop;
+    const active = document.activeElement && document.activeElement.closest && document.activeElement.closest('.sign-row[data-id]');
+    const activeId = active ? active.dataset.id : null;
+    const caret = activeId ? document.activeElement.selectionStart : null;
+
+    const old = rows.size ? new Map([...rows].map(([id, r]) => [id, r.size])) : new Map();
     rows.clear();
     list.replaceChildren();
     if (!set.signs.length) {
-      list.append(S.el('div', { class: 'empty-state', text: 'No signs yet. Type a name above and press Enter.' }));
+      list.append(S.el('div', { class: 'empty-state', text: 'No signs yet. Start typing in the blank row above.' }));
     }
-    for (const sign of set.signs) list.append(buildRow(sign).el);
+
+    const fresh = newSigns();
+    if (fresh.length) {
+      list.append(groupHead('New', fresh.length));
+      for (const sign of fresh) list.append(buildRow(sign).el);
+    }
+    const byDay = new Map();
+    for (const sign of set.signs) {
+      if (!sign.exported_at) continue;
+      const day = sign.exported_at.slice(0, 10);
+      if (!byDay.has(day)) byDay.set(day, []);
+      byDay.get(day).push(sign);
+    }
+    for (const day of [...byDay.keys()].sort().reverse()) {
+      const signs = byDay.get(day);
+      list.append(groupHead(`Exported ${S.shortDate(signs[0].exported_at)}`, signs.length));
+      for (const sign of signs) list.append(buildRow(sign).el);
+    }
+
+    for (const [id, r] of rows) r.size = old.get(id) || null;
     list.scrollTop = top;
-    applyScopeDim();
+    applyScope();
     applyPreview();
     updateChrome();
+
+    if (activeId && rows.has(activeId)) {
+      const input = rows.get(activeId).input;
+      input.focus();
+      if (caret !== null) input.setSelectionRange(caret, caret);
+    }
   }
 
   // --- Adding, deleting, marking -------------------------------------------
@@ -356,16 +406,19 @@
     renderList();
     scheduleSave();
     schedulePreview();
+    return fresh[0];
   }
 
-  addInput.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' || e.isComposing) return;
-    e.preventDefault();
-    const text = addInput.value.trim();
-    if (!text) return;
-    addSigns([text]);
+  /* Typing in the blank row creates the sign and carries on in its own row. */
+  addInput.addEventListener('input', () => {
+    const text = addInput.value;
+    if (!text.trim()) return;
     addInput.value = '';
-    addInput.focus();
+    const sign = addSigns([text.trimStart()]);
+    sign.fresh = true;
+    const input = rows.get(sign.id).input;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   });
 
   addInput.addEventListener('paste', (e) => {
@@ -375,15 +428,22 @@
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     if (lines.length) addSigns(lines);
     addInput.value = '';
+    addInput.focus();
   });
 
-  function deleteSign(sign) {
+  function removeSign(sign) {
     const index = set.signs.indexOf(sign);
-    if (index < 0) return;
+    if (index < 0) return -1;
     set.signs.splice(index, 1);
     renderList();
     scheduleSave();
     schedulePreview();
+    return index;
+  }
+
+  function deleteSign(sign) {
+    const index = removeSign(sign);
+    if (index < 0) return;
     S.toast(`Deleted "${sign.text}"`, {
       ms: 6000,
       action: {
@@ -403,8 +463,7 @@
       await flush();
       const data = await S.api('POST', `${S.setUrl(state.name)}/signs/${sign.id}/renew`);
       mergeServerMeta(data);
-      refreshRowMeta();
-      updateChrome();
+      renderList();
     } catch (e) {
       S.toast('Could not mark as new: ' + e.message, { type: 'error' });
     }
@@ -415,8 +474,7 @@
       await flush();
       const data = await S.api('POST', `${S.setUrl(state.name)}/renew-all`);
       mergeServerMeta(data);
-      refreshRowMeta();
-      updateChrome();
+      renderList();
       schedulePreview();
     } catch (e) {
       S.toast('Could not mark all as new: ' + e.message, { type: 'error' });
@@ -469,22 +527,28 @@
     const nNew = newSigns().length;
     const total = set.signs.length;
     const [btnNew, btnAll] = $('scope').children;
-    btnNew.textContent = `New only (${nNew})`;
+    btnNew.textContent = `New (${nNew})`;
     btnAll.textContent = `All (${total})`;
     btnNew.classList.toggle('active', state.scope === 'new');
     btnAll.classList.toggle('active', state.scope === 'all');
+    for (const b of $('format').children) b.classList.toggle('active', b.dataset.format === state.format);
     const count = scopeCount();
-    exportBtn.textContent = state.busy ? 'Exporting…' : `Export ${count} ${count === 1 ? 'sign' : 'signs'}`;
+    exportBtn.textContent = state.busy ? 'Exporting'
+      : count ? `Export ${plural(count)}`
+      : (total ? 'Nothing new to export' : 'No signs yet');
     exportBtn.disabled = state.busy || count === 0;
-    $('export-note').textContent = count === 0
-      ? (total === 0 ? 'No signs yet' : 'Nothing new to export')
-      : '';
   }
 
   for (const btn of $('scope').children) {
     btn.addEventListener('click', () => {
       state.scope = btn.dataset.scope;
-      applyScopeDim();
+      applyScope();
+      updateExportBar();
+    });
+  }
+  for (const btn of $('format').children) {
+    btn.addEventListener('click', () => {
+      state.format = btn.dataset.format;
       updateExportBar();
     });
   }
@@ -492,6 +556,7 @@
   function showStatus(kind, text, link) {
     statusLine.hidden = false;
     statusLine.className = 'export-status' + (kind === 'error' ? ' error' : '');
+    statusLine.title = link ? link.filename : '';
     statusLine.replaceChildren(S.el('span', { text }));
     if (link) {
       statusLine.append(S.el('a', { href: `/api/download?id=${encodeURIComponent(link.token)}`, text: 'Download again' }));
@@ -508,10 +573,9 @@
 
   function setBusy(busy) {
     state.busy = busy;
-    $('add-input').parentElement.inert = busy;
+    addInput.disabled = busy;
     list.inert = busy;
     nameInput.disabled = busy;
-    $('open-panel').disabled = busy;
     $('panel').inert = busy;
     updateExportBar();
   }
@@ -522,28 +586,27 @@
     setBusy(true);
     $('progress').hidden = false;
     bar.style.width = '0%';
-    showStatus('info', 'Saving…');
+    showStatus('info', 'Saving');
     let poll = null;
     try {
       await flush();
-      showStatus('info', 'Starting export…');
+      showStatus('info', 'Starting');
       poll = setInterval(async () => {
         try {
           const p = await S.api('GET', '/api/progress');
           if (p.active && p.total > 0) {
             bar.style.width = `${(p.current / p.total) * 100}%`;
-            showStatus('info', `Generating sign ${p.current} of ${p.total}…`);
+            showStatus('info', `Sign ${p.current} of ${p.total}`);
           }
         } catch (e) { /* the export request reports real errors */ }
       }, 500);
-      const res = await S.api('POST', `${S.setUrl(state.name)}/export`, { scope: state.scope, format: $('format').value });
+      const res = await S.api('POST', `${S.setUrl(state.name)}/export`, { scope: state.scope, format: state.format });
       bar.style.width = '100%';
       mergeServerMeta(res.set);
       state.lastExport = { token: res.token, filename: res.filename, set: state.name, count: res.count };
-      showStatus('success', `Exported ${res.count} ${res.count === 1 ? 'sign' : 'signs'}: ${res.filename}`, state.lastExport);
+      showStatus('success', `Exported ${plural(res.count)}.`, state.lastExport);
       startDownload(res.token);
-      refreshRowMeta();
-      updateChrome();
+      renderList();
       schedulePreview();
     } catch (e) {
       showStatus('error', 'Export failed: ' + e.message);
@@ -559,6 +622,12 @@
 
   nameInput.value = set.name;
   document.title = `${set.name} - Signerate`;
+  let panelOpen = false;
+  try { panelOpen = localStorage.getItem(PANEL_KEY) === '1'; } catch (e) { /* private mode */ }
+  if (panelOpen) {
+    $('panel').hidden = false;
+    $('open-panel').setAttribute('aria-pressed', 'true');
+  }
   renderList();
   runPreview();
   setSaveState('');
@@ -567,7 +636,7 @@
     const last = await S.api('GET', '/api/last-export');
     if (last && last.set === state.name) {
       state.lastExport = last;
-      showStatus('info', `Last export: ${last.filename}`, last);
+      showStatus('info', last.count ? `Last export: ${plural(last.count)}.` : 'Last export ready.', last);
     }
   } catch (e) { /* optional */ }
 })();

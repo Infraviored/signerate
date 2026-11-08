@@ -40,6 +40,7 @@
 
   S.ICON_TRASH = ['M3 6h18', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2', 'M10 11v6', 'M14 11v6'];
   S.ICON_CLOSE = ['M18 6L6 18', 'M6 6l12 12'];
+  S.ICON_RENEW = ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5'];
 
   S.debounce = function (fn, ms) {
     let t = null;
@@ -81,7 +82,7 @@
   S.shortDate = (iso) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
   S.summaryText = function (st) {
-    return `${S.num(st.width)} × ${S.num(st.height)} × ${S.num(st.base_thickness)} mm · ${S.fontName(st.font_path)}`;
+    return `${S.num(st.width)} × ${S.num(st.height)} × ${S.num(st.base_thickness)} mm, ${S.fontName(st.font_path)}`;
   };
 
   // --- Fonts ----------------------------------------------------------------
@@ -116,10 +117,15 @@
 
   // --- Sign preview ---------------------------------------------------------
 
-  /* A sign as SVG in mm units. fontSize null = rough guess before the server answered. */
-  S.signSvg = function (st, text, fontSize) {
+  S.guessFontSize = (st) => (st.height - 2 * st.min_margin) * 0.7;
+
+  /* Pixels per millimetre so a plate fits inside maxW x maxH. */
+  S.plateScale = (st, maxW, maxH) => Math.min(maxW / st.width, maxH / st.height);
+
+  /* A sign as SVG in mm units, drawn at `scale` px/mm. fontSize null = rough guess. */
+  S.signSvg = function (st, text, fontSize, scale) {
     const w = st.width, h = st.height, m = st.min_margin;
-    const size = fontSize || (h - 2 * m) * 0.7;
+    const size = fontSize || S.guessFontSize(st);
     let x = w / 2, anchor = 'middle';
     if (st.horizontal_align === 'left') { x = m; anchor = 'start'; }
     else if (st.horizontal_align === 'right') { x = w - m; anchor = 'end'; }
@@ -128,8 +134,8 @@
       'font-size': size, 'text-anchor': anchor, 'dominant-baseline': 'central',
     });
     label.textContent = text;
-    return S.svg('svg', { class: 'sign-preview', viewBox: `0 0 ${w} ${h}`, preserveAspectRatio: 'xMidYMid meet' },
-      S.svg('rect', { x: 0, y: 0, width: w, height: h, fill: st.bg_color, rx: 1, ry: 1 }),
+    return S.svg('svg', { class: 'sign-svg', width: w * scale, height: h * scale, viewBox: `0 0 ${w} ${h}` },
+      S.svg('rect', { x: 0, y: 0, width: w, height: h, fill: st.bg_color, rx: 0.8, ry: 0.8 }),
       label);
   };
 
@@ -151,42 +157,71 @@
       err.min_margin = 'Too large for the width/height.';
     }
     if (!s.font_path) err.font_path = 'Choose a font.';
+    if (s.text_size !== null && (!fin(s.text_size) || s.text_size <= 0)) err.text_size = 'Text size must be greater than 0.';
     return err;
   };
 
   S.thicknessWarning = function (s) {
     const minZ = s.base_thickness + s.text_protrusion - s.text_thickness;
-    if (minZ < -0.01) return { level: 'danger', title: 'POKES THROUGH BACK', detail: `Text is ${Math.abs(minZ).toFixed(2)} mm too deep!` };
-    if (minZ < 0.4) return { level: 'warn', title: 'FRAGILE BACK', detail: `Remaining back wall: ${minZ.toFixed(2)} mm` };
+    if (minZ < -0.01) return { level: 'danger', text: `The text goes through the back of the plate. Reduce the text depth by ${Math.abs(minZ).toFixed(2)} mm.` };
+    if (minZ < 0.4) return { level: 'warn', text: `Thin back wall: ${minZ.toFixed(2)} mm behind the text.` };
     return null;
   };
 
   const FIELDS = [
-    ['width', 'Width (mm)', 'The full horizontal width of each sign plate.', { min: 1, step: 0.5 }],
-    ['height', 'Height (mm)', 'The vertical height of each sign plate.', { min: 1, step: 0.5 }],
-    ['base_thickness', 'Total Thickness (mm)', 'The thickness of the background plate.', { min: 0.1, step: 0.2 }],
-    ['text_thickness', 'Text Thickness (mm)', 'The depth of the text extrusion. Should usually be less than (Total Thickness + Protrusion).', { min: 0.1, step: 0.2 }],
-    ['min_margin', 'Min. Margin (mm)', 'Minimum empty space ensured between the text and the sign edges.', { min: 0, step: 0.5 }],
-    ['text_protrusion', 'Protrusion (mm)', 'Distance the text sticks out from the front surface. 0 = Flush with top.', { step: 0.1 }],
+    ['width', 'Width (mm)', '', { min: 1, step: 0.5 }],
+    ['height', 'Height (mm)', '', { min: 1, step: 0.5 }],
+    ['base_thickness', 'Thickness (mm)', '', { min: 0.1, step: 0.2 }],
+    ['min_margin', 'Margin (mm)', 'Kept free around the text.', { min: 0, step: 0.5 }],
+    ['text_thickness', 'Text depth (mm)', 'How deep the letters go.', { min: 0.1, step: 0.2 }],
+    ['text_protrusion', 'Raised by (mm)', '0 is flush with the plate.', { step: 0.1 }],
   ];
 
   /* Dimension and style fields, shared by the editor panel and the New Set wizard.
-     onChange(settings, valid) fires on every edit. */
-  S.SettingsForm = function (initial, onChange) {
+     onChange(settings, valid) fires on every edit. suggestSize() prefills a fixed text size. */
+  S.SettingsForm = function (initial, onChange, suggestSize) {
     const inputs = {};
     let current = { ...initial };
 
-    function labelRow(text, tip, forId) {
-      return S.el('div', { class: 'label-wrapper' },
-        S.el('label', { text, htmlFor: forId }),
-        tip ? S.el('span', { class: 'help-icon', text: '?', attrs: { 'data-tooltip': tip } }) : null);
+    const FIT_HINT = 'Fills the width or height. The longest sign sets the size for all.';
+    const FIXED_HINT = 'A sign too long for this size shrinks to fit.';
+    const sizeFit = S.el('button', { type: 'button', text: 'Fit plate', on: { click: () => setFixed(false) } });
+    const sizeFixed = S.el('button', { type: 'button', text: 'Fixed', on: { click: () => setFixed(true) } });
+    const sizeInput = S.el('input', { type: 'number', id: 'f-text_size', attrs: { min: 0.5, step: 0.5, 'aria-label': 'Fixed text size in mm' } });
+    const sizeHint = S.el('div', { class: 'field-hint' });
+    sizeInput.addEventListener('input', changed);
+
+    function showSizeMode(fixed) {
+      sizeFit.classList.toggle('active', !fixed);
+      sizeFixed.classList.toggle('active', fixed);
+      sizeInput.hidden = !fixed;
+      sizeHint.textContent = fixed ? FIXED_HINT : FIT_HINT;
     }
 
-    function numberField(key, label, tip, attrs) {
+    function setFixed(fixed) {
+      if (fixed && sizeInput.value === '') {
+        const guess = (suggestSize && suggestSize()) || S.guessFontSize(read());
+        sizeInput.value = Math.round(guess * 2) / 2 || 1;
+      }
+      showSizeMode(fixed);
+      changed();
+      if (fixed) sizeInput.focus();
+    }
+
+    function showSize(value) {
+      sizeInput.value = value || '';
+      showSizeMode(!!value);
+    }
+
+    const label = (text, forId) => S.el('label', { text, htmlFor: forId || '' });
+
+    function numberField(key) {
+      const [, text, hint, attrs] = FIELDS.find((f) => f[0] === key);
       const input = S.el('input', { type: 'number', id: 'f-' + key, value: current[key], attrs });
       input.addEventListener('input', changed);
       inputs[key] = input;
-      return S.el('div', { class: 'field-group' }, labelRow(label, tip, 'f-' + key), input);
+      return S.el('div', { class: 'field' }, label(text, 'f-' + key), input,
+        hint ? S.el('div', { class: 'field-hint', text: hint }) : null);
     }
 
     const colorBg = S.el('input', { type: 'color', id: 'f-bg_color', value: current.bg_color });
@@ -199,22 +234,27 @@
     for (const el of [colorBg, colorText]) el.addEventListener('input', changed);
     align.addEventListener('change', changed);
 
-    const num = (key) => FIELDS.find((f) => f[0] === key);
-    const pair = (a, b) => S.el('div', { class: 'grid' },
-      numberField(a, num(a)[1], num(a)[2], num(a)[3]), numberField(b, num(b)[1], num(b)[2], num(b)[3]));
+    const pair = (...children) => S.el('div', { class: 'field-pair' }, ...children);
 
     const el = S.el('div', { class: 'settings-form' },
-      S.el('div', { class: 'form-section', text: 'Dimensions' }),
-      pair('width', 'height'),
-      pair('base_thickness', 'text_thickness'),
-      pair('min_margin', 'text_protrusion'),
-      S.el('div', { class: 'form-section', text: 'Style' }),
-      S.el('div', { class: 'grid' },
-        S.el('div', { class: 'field-group' }, labelRow('Background Color', null, 'f-bg_color'), colorBg),
-        S.el('div', { class: 'field-group' }, labelRow('Text Color', null, 'f-text_color'), colorText)),
-      S.el('div', { class: 'field-group' }, labelRow('Font', null), picker.el),
-      S.el('div', { class: 'field-group' }, labelRow('Horizontal Align', null, 'f-horizontal_align'), align),
+      S.el('h3', { class: 'form-section', text: 'Plate' }),
+      pair(numberField('width'), numberField('height')),
+      pair(numberField('base_thickness'), numberField('min_margin')),
+      S.el('h3', { class: 'form-section', text: 'Text' }),
+      S.el('div', { class: 'field' }, label('Font'), picker.el),
+      S.el('div', { class: 'field' }, label('Text size'),
+        S.el('div', { class: 'size-row' },
+          S.el('div', { class: 'segmented segmented-light', attrs: { role: 'group', 'aria-label': 'Text size mode' } }, sizeFit, sizeFixed),
+          S.el('label', { class: 'size-input' }, sizeInput)),
+        sizeHint),
+      pair(numberField('text_thickness'), numberField('text_protrusion')),
+      S.el('div', { class: 'field' }, label('Alignment', 'f-horizontal_align'), align),
+      S.el('h3', { class: 'form-section', text: 'Colours' }),
+      pair(S.el('div', { class: 'field' }, label('Plate', 'f-bg_color'), colorBg),
+        S.el('div', { class: 'field' }, label('Text', 'f-text_color'), colorText)),
       errorLine);
+
+    showSize(current.text_size);
 
     function read() {
       const s = { ...current };
@@ -222,6 +262,9 @@
       s.bg_color = colorBg.value;
       s.text_color = colorText.value;
       s.horizontal_align = align.value;
+      s.text_size = sizeFixed.classList.contains('active')
+        ? (sizeInput.value === '' ? NaN : parseFloat(sizeInput.value))
+        : null;
       return s;
     }
 
@@ -229,6 +272,7 @@
       const s = read();
       const errors = S.checkSettings(s);
       for (const [key] of FIELDS) inputs[key].classList.toggle('invalid', !!errors[key]);
+      sizeInput.classList.toggle('invalid', !!errors.text_size);
       errorLine.textContent = Object.values(errors)[0] || '';
       current = { ...current, ...s };
       onChange(s, Object.keys(errors).length === 0);
@@ -244,6 +288,8 @@
         colorText.value = s.text_color;
         align.value = s.horizontal_align;
         picker.set(s.font_path);
+        showSize(s.text_size);
+        sizeInput.classList.remove('invalid');
         for (const [key] of FIELDS) inputs[key].classList.remove('invalid');
         errorLine.textContent = '';
       },
@@ -255,7 +301,7 @@
   S.FontPicker = function (value, onSelect) {
     const label = S.el('span');
     const trigger = S.el('div', { class: 'dropdown-trigger', tabIndex: 0 }, label);
-    const search = S.el('input', { type: 'text', placeholder: 'Search fonts...' });
+    const search = S.el('input', { type: 'text', placeholder: 'Search fonts', attrs: { 'aria-label': 'Search fonts' } });
     const list = S.el('div', { class: 'dropdown-list' });
     const content = S.el('div', { class: 'dropdown-content' },
       S.el('div', { class: 'dropdown-search' }, search), list);
