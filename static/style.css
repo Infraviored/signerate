@@ -145,11 +145,16 @@ a { color: inherit; }
 .shelf-actions { position: relative; z-index: 1; margin-left: auto; display: flex; align-items: center; gap: .35rem; align-self: center; }
 .shelf-signs {
   display: flex; align-items: flex-end; gap: .75rem;
-  overflow: hidden;
+  overflow: auto hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-left: 6px;
+  scrollbar-width: thin;
   padding: 6px 6px 10px;
   border-bottom: 7px solid var(--anthracite);
   box-shadow: 0 9px 10px -6px rgb(27 32 35 / .4);
 }
+.shelf-signs > * { flex: none; scroll-snap-align: start; }
 
 /* --- Editor frame ------------------------------------------------------- */
 .editor { height: var(--app-h, 100dvh); transform: translateY(var(--app-top, 0px)); display: flex; flex-direction: column; }
