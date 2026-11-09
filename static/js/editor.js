@@ -14,7 +14,8 @@
 
   const state = {
     name: $('editor').dataset.setName,
-    scope: 'new',        // "New" every time the page loads
+    selected: new Set(), // ids of the signs the next export acts on (client state only)
+    stale: false,        // another tab changed the Set; saving is stopped until a reload
     format: '3mf',
     destination: 'download',
     dirty: false,
@@ -27,7 +28,8 @@
   };
   let set = null;
   let scale = 1;
-  const rows = new Map(); // sign id -> {sign, el, box, input, note, actions, shrunk, size}
+  const rows = new Map(); // sign id -> {sign, el, box, check, input, note, actions, shrunk, size}
+  let heads = [];         // day headings: {check, signs}
 
   const list = $('sign-list');
   const addInput = $('add-input');
@@ -78,7 +80,24 @@
   }
 
   const newSigns = () => set.signs.filter((s) => !s.exported_at);
-  const scopeCount = () => (state.scope === 'new' ? newSigns().length : set.signs.length);
+  const selectedSigns = () => set.signs.filter((s) => state.selected.has(s.id));
+  const sameIds = (ids) => ids.length > 0 && ids.length === state.selected.size && ids.every((id) => state.selected.has(id));
+
+  function dayKey(iso) {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }
+
+  function dayLabel(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    if (dayKey(iso) === dayKey(now.toISOString())) return 'Today';
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    if (dayKey(iso) === dayKey(yesterday.toISOString())) return 'Yesterday';
+    return d.toLocaleDateString('en-GB', d.getFullYear() === now.getFullYear()
+      ? { day: 'numeric', month: 'short' }
+      : { day: 'numeric', month: 'short', year: 'numeric' });
+  }
   const plural = (n) => `${n} ${n === 1 ? 'sign' : 'signs'}`;
 
   function sameParams(x, y) {
@@ -115,6 +134,7 @@
 
   // --- Saving ---------------------------------------------------------------
 
+  const STALE_MESSAGE = 'Changed elsewhere. Click to reload.';
   let saveTimer = null;
   let retryTimer = null;
   const saveState = $('save-state');
@@ -127,12 +147,14 @@
 
   function payload() {
     return {
+      base_updated_at: set.updated_at,
       settings: set.settings,
       signs: set.signs.map((s) => ({ id: s.id, text: s.text, created_at: s.created_at, exported_at: s.exported_at })),
     };
   }
 
   async function doSave() {
+    if (state.stale) throw new Error(STALE_MESSAGE);
     if (!state.dirty || state.formInvalid) return;
     state.dirty = false;
     setSaveState('saving');
@@ -143,6 +165,12 @@
       updateChrome();
     } catch (e) {
       state.dirty = true;
+      if (e.status === 409) { // another tab saved in between: keep the text on screen, never overwrite
+        state.stale = true;
+        clearTimeout(retryTimer);
+        setSaveState('error', STALE_MESSAGE);
+        throw e;
+      }
       if (e.status === 400) form.setError(e.message);
       setSaveState('error', 'Not saved: ' + e.message + ' Click to retry.');
       if (!e.status || e.status >= 500) {
@@ -160,18 +188,19 @@
 
   function scheduleSave() {
     state.dirty = true;
-    if (state.formInvalid) return;
+    if (state.formInvalid || state.stale) return;
     setSaveState('saving');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => flush().catch(() => {}), 400);
   }
 
   saveState.addEventListener('click', () => {
+    if (state.stale) { location.reload(); return; }
     if (saveState.classList.contains('error') && !state.formInvalid) flush().catch(() => {});
   });
 
   function saveOnLeave() {
-    if (!state.dirty || state.formInvalid) return;
+    if (!state.dirty || state.formInvalid || state.stale) return;
     state.dirty = false;
     fetch(S.setUrl(state.name), {
       method: 'PUT',
@@ -333,19 +362,47 @@
     r.actions.replaceChildren(...kids);
   }
 
-  function applyScope() {
+  /* A checkbox in a native label: the label is the (large) touch target. */
+  function pick(input) {
+    return S.el('label', { class: 'pick' }, input);
+  }
+
+  function checkbox(label, onChange) {
+    return S.el('input', { type: 'checkbox', attrs: { 'aria-label': label }, on: { change: (e) => onChange(e.target.checked) } });
+  }
+
+  function setSelected(sign, on) {
+    if (on) state.selected.add(sign.id); else state.selected.delete(sign.id);
+  }
+
+  /* Brings every checkbox, row tint, day heading and the export bar in line with `state.selected`. */
+  function applySelection() {
+    for (const id of [...state.selected]) if (!rows.has(id)) state.selected.delete(id);
     for (const r of rows.values()) {
-      r.el.classList.toggle('included', state.scope === 'all' || !r.sign.exported_at);
+      const on = state.selected.has(r.sign.id);
+      r.check.checked = on;
+      r.el.classList.toggle('selected', on);
+      r.el.classList.toggle('is-new', !r.sign.exported_at);
+      r.check.setAttribute('aria-label', `Select ${r.sign.text}`);
     }
+    for (const h of heads) {
+      const n = h.signs.filter((s) => state.selected.has(s.id)).length;
+      h.check.checked = n === h.signs.length;
+      h.check.indeterminate = n > 0 && n < h.signs.length;
+    }
+    updateExportBar();
   }
 
   function buildRow(sign) {
     const box = S.el('div', { class: 'plate-slot' });
+    const check = checkbox('Select sign', (on) => { setSelected(sign, on); applySelection(); });
     const input = S.el('textarea', { class: 'sign-input', rows: sign.text.split('\n').length, value: sign.text, maxLength: 200, attrs: { 'aria-label': 'Sign text' } });
     const note = S.el('span', { class: 'row-note' });
     const actions = S.el('div', { class: 'row-actions' });
-    const el = S.el('div', { class: 'sign-row', dataset: { id: sign.id } }, box, input, note, actions);
-    const r = { sign, el, box, input, note, actions, shrunk: false, size: null, moved: false };
+    const el = S.el('div', { class: 'sign-row', dataset: { id: sign.id } }, pick(check), box, input, note, actions);
+    const r = { sign, el, box, check, input, note, actions, shrunk: false, size: null, moved: false };
+
+    box.addEventListener('click', () => { setSelected(sign, !state.selected.has(sign.id)); applySelection(); });
 
     input.addEventListener('input', () => {
       input.rows = input.value.split('\n').length;
@@ -356,11 +413,12 @@
       if (sign.exported_at) { // changed after printing; it moves to New when editing ends
         sign.exported_at = null;
         r.moved = true;
-        applyScope();
+        state.selected.add(sign.id); // new again: ready for the next export
       }
       drawRow(r);
       scheduleSave();
       updateChrome();
+      applySelection();
       schedulePreview();
     });
     input.addEventListener('blur', () => {
@@ -383,11 +441,16 @@
     return r;
   }
 
-  function groupHead(title, count) {
-    return S.el('h3', { class: 'group-head' }, S.el('span', { text: title }), S.el('span', { class: 'group-count', text: String(count) }));
+  function groupHead(title, signs) {
+    const check = checkbox(`Select all signs of ${title}`, (on) => {
+      for (const sign of signs) setSelected(sign, on);
+      applySelection();
+    });
+    heads.push({ check, signs });
+    return S.el('h3', { class: 'group-head' }, pick(check), S.el('span', { text: title }), S.el('span', { class: 'group-count', text: String(signs.length) }));
   }
 
-  /* New signs first, then one group per export day, newest first. */
+  /* One chronological list, newest first, with one heading per day the signs were created. */
   function renderList() {
     const top = list.scrollTop;
     const active = document.activeElement && document.activeElement.closest && document.activeElement.closest('.sign-row[data-id]');
@@ -396,32 +459,31 @@
 
     const old = rows.size ? new Map([...rows].map(([id, r]) => [id, r.size])) : new Map();
     rows.clear();
+    heads = [];
     list.replaceChildren();
     if (!set.signs.length) {
       list.append(S.el('div', { class: 'empty-state', text: 'No signs yet. Start typing in the blank row above.' }));
     }
 
-    const fresh = newSigns();
-    if (fresh.length) {
-      list.append(groupHead('New', fresh.length));
-      for (const sign of fresh) list.append(buildRow(sign).el);
-    }
+    // Array.sort is stable: signs created at the same moment keep their stored order.
+    const ordered = set.signs
+      .map((sign) => ({ sign, t: Date.parse(sign.created_at) || 0 }))
+      .sort((x, y) => y.t - x.t)
+      .map((x) => x.sign);
     const byDay = new Map();
-    for (const sign of set.signs) {
-      if (!sign.exported_at) continue;
-      const day = sign.exported_at.slice(0, 10);
+    for (const sign of ordered) {
+      const day = dayKey(sign.created_at);
       if (!byDay.has(day)) byDay.set(day, []);
       byDay.get(day).push(sign);
     }
-    for (const day of [...byDay.keys()].sort().reverse()) {
-      const signs = byDay.get(day);
-      list.append(groupHead(`Exported ${S.shortDate(signs[0].exported_at)}`, signs.length));
+    for (const signs of byDay.values()) {
+      list.append(groupHead(dayLabel(signs[0].created_at), signs));
       for (const sign of signs) list.append(buildRow(sign).el);
     }
 
     for (const [id, r] of rows) r.size = old.get(id) || null;
     list.scrollTop = top;
-    applyScope();
+    applySelection();
     applyPreview();
     updateChrome();
 
@@ -439,6 +501,7 @@
     const fresh = lines.map((text) => ({ id: newId(), text: text.slice(0, 200), created_at: now, exported_at: null }));
     // The last line ends up on top ("newest first").
     set.signs.unshift(...fresh.reverse());
+    for (const sign of fresh) state.selected.add(sign.id);
     list.scrollTop = 0;
     renderList();
     scheduleSave();
@@ -472,6 +535,7 @@
     const index = set.signs.indexOf(sign);
     if (index < 0) return -1;
     set.signs.splice(index, 1);
+    state.selected.delete(sign.id);
     renderList();
     scheduleSave();
     schedulePreview();
@@ -479,6 +543,7 @@
   }
 
   function deleteSign(sign) {
+    const wasSelected = state.selected.has(sign.id);
     const index = removeSign(sign);
     if (index < 0) return;
     S.toast(`Deleted "${sign.text}"`, {
@@ -487,6 +552,7 @@
         label: 'Undo',
         fn: () => {
           set.signs.splice(Math.min(index, set.signs.length), 0, sign);
+          if (wasSelected) state.selected.add(sign.id);
           renderList();
           scheduleSave();
           schedulePreview();
@@ -500,6 +566,7 @@
       await flush();
       const data = await S.api('POST', `${S.setUrl(state.name)}/signs/${sign.id}/renew`);
       mergeServerMeta(data);
+      state.selected.add(sign.id);
       renderList();
     } catch (e) {
       S.toast('Could not mark as new: ' + e.message, { type: 'error' });
@@ -511,6 +578,7 @@
       await flush();
       const data = await S.api('POST', `${S.setUrl(state.name)}/renew-all`);
       mergeServerMeta(data);
+      for (const s of set.signs) state.selected.add(s.id);
       renderList();
       schedulePreview();
     } catch (e) {
@@ -540,6 +608,7 @@
       });
       state.name = data.name;
       set.name = data.name;
+      set.updated_at = data.updated_at;
       nameInput.value = data.name;
       fitName();
       nameError.hidden = true;
@@ -564,29 +633,31 @@
   const statusLine = $('export-status');
 
   function updateExportBar() {
-    const nNew = newSigns().length;
-    const total = set.signs.length;
+    const newIds = newSigns().map((x) => x.id);
+    const allIds = set.signs.map((x) => x.id);
+    const total = allIds.length;
     const [btnNew, btnAll] = $('scope').children;
-    btnNew.textContent = `New (${nNew})`;
+    btnNew.textContent = `New (${newIds.length})`;
     btnAll.textContent = `All (${total})`;
-    btnNew.classList.toggle('active', state.scope === 'new');
-    btnAll.classList.toggle('active', state.scope === 'all');
+    btnNew.classList.toggle('active', sameIds(newIds));
+    btnAll.classList.toggle('active', sameIds(allIds));
     for (const b of $('format').children) b.classList.toggle('active', b.dataset.format === state.format);
     for (const b of $('destination').children) b.classList.toggle('active', b.dataset.destination === state.destination);
-    const count = scopeCount();
+    const count = selectedSigns().length;
     exportBtn.textContent = state.busy ? 'Exporting'
       : count ? `Export ${plural(count)}`
-      : (total ? 'Nothing new to export' : 'No signs yet');
+      : (total ? 'Select signs to export' : 'No signs yet');
     exportBtn.disabled = state.busy || count === 0;
   }
 
-  for (const btn of $('scope').children) {
-    btn.addEventListener('click', () => {
-      state.scope = btn.dataset.scope;
-      applyScope();
-      updateExportBar();
-    });
-  }
+  $('scope').children[0].addEventListener('click', () => {
+    state.selected = new Set(newSigns().map((x) => x.id));
+    applySelection();
+  });
+  $('scope').children[1].addEventListener('click', () => {
+    state.selected = new Set(set.signs.map((x) => x.id));
+    applySelection();
+  });
   for (const btn of $('format').children) {
     btn.addEventListener('click', () => {
       state.format = btn.dataset.format;
@@ -630,7 +701,8 @@
   }
 
   async function doExport() {
-    if (state.busy || scopeCount() === 0) return;
+    const ids = selectedSigns().map((x) => x.id);
+    if (state.busy || ids.length === 0) return;
     const bar = $('progress-bar');
     setBusy(true);
     $('progress').hidden = false;
@@ -649,9 +721,10 @@
           }
         } catch (e) { /* the export request reports real errors */ }
       }, 500);
-      const res = await S.api('POST', `${S.setUrl(state.name)}/export`, { scope: state.scope, format: state.format, destination: state.destination });
+      const res = await S.api('POST', `${S.setUrl(state.name)}/export`, { ids, format: state.format, destination: state.destination });
       bar.style.width = '100%';
       mergeServerMeta(res.set);
+      for (const id of ids) state.selected.delete(id);
       state.lastExport = { token: res.token, filename: res.filename, set: state.name, count: res.count };
       if (state.destination === 'nextcloud') {
         showStatus('success', `Saved ${plural(res.count)} to Nextcloud.`, state.lastExport);
@@ -683,6 +756,7 @@
     $('editor').classList.add('panel-open');
     $('open-panel').setAttribute('aria-pressed', 'true');
   }
+  state.selected = new Set(newSigns().map((x) => x.id)); // everything not yet printed starts selected
   renderList();
   runPreview();
   setSaveState('');

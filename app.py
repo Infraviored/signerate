@@ -191,7 +191,8 @@ def api_export(name):
                 raise ApiError(str(e), 502)
 
         deliver = to_nextcloud if destination == "nextcloud" else None
-        result = sets_store.run_export(name, scope, fmt, path, generate_signs, on_progress, deliver)
+        result = sets_store.run_export(name, scope, fmt, path, generate_signs, on_progress, deliver,
+                                     ids=data.get("ids"))
         PROGRESS.update(current=result["count"], total=result["count"])
 
         old = LAST_EXPORT

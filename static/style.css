@@ -177,13 +177,20 @@ a { color: inherit; }
 /* A row: the rendered sign on the left, its text on the right. */
 .sign-row {
   display: grid;
-  grid-template-columns: var(--plate-w) minmax(0, 1fr) auto auto;
+  grid-template-columns: auto var(--plate-w) minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 1.25rem;
   padding: .4rem 1rem .4rem 1.25rem;
   border-left: 4px solid transparent;
 }
+.sign-row.add-row { grid-template-columns: var(--plate-w) minmax(0, 1fr); }
 .plate-slot { line-height: 0; }
+.tray .plate-slot { cursor: pointer; }
+
+/* Selection checkbox: the label around it is the touch target. */
+.pick { display: grid; place-items: center; width: 2rem; height: 2rem; margin: -.25rem; cursor: pointer; }
+.pick input { width: 1.2rem; height: 1.2rem; margin: 0; accent-color: var(--anthracite); cursor: pointer; }
+.sign-row.selected { background: rgb(27 32 35 / .06); }
 
 .sign-input {
   width: 100%;
@@ -211,13 +218,13 @@ a { color: inherit; }
   overscroll-behavior: contain;
   padding-bottom: .5rem;
 }
-.sign-row.included { border-left-color: var(--signal); }
+.sign-row.is-new { border-left-color: var(--signal); }
 
 .group-head {
   position: sticky; top: 0; z-index: 2;
-  display: flex; gap: .5rem; align-items: baseline;
+  display: flex; gap: .5rem; align-items: center;
   background: var(--bed);
-  padding: .55rem 1rem .3rem 1.5rem;
+  padding: .4rem 1rem .2rem calc(1.25rem + 4px);
   font: 600 1.2rem/1.2 var(--display);
 }
 .group-count { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
@@ -375,6 +382,9 @@ dialog h2 { font: 600 1.8rem/1.2 var(--display); margin-bottom: .8rem; }
   .dropdown-option { min-height: var(--tap); display: flex; align-items: center; }
   .dropdown-option[hidden] { display: none; }
   .sign-input, .set-name-input { min-height: var(--tap); }
+  .pick { width: var(--tap); height: var(--tap); margin: 0; }
+  .pick input { width: 1.4rem; height: 1.4rem; }
+  .group-head { min-height: var(--tap); }
   .shelf-name { display: inline-flex; align-items: center; min-height: var(--tap); }
   .wizard-option, .check-row { min-height: var(--tap); }
   .wizard-option input, .check-row input { width: 1.25rem; height: 1.25rem; }
@@ -385,19 +395,21 @@ dialog h2 { font: 600 1.8rem/1.2 var(--display); margin-bottom: .8rem; }
 
 @container workspace (max-width: 760px) {
   .sign-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "plate plate" "note note" "input actions";
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "plate plate plate" "note note note" "check input actions";
     align-items: start;
     gap: .1rem .5rem;
     padding: .6rem .6rem .6rem .9rem;
   }
+  .sign-row.add-row { grid-template-columns: minmax(0, 1fr); grid-template-areas: "plate" "input"; }
+  .sign-row > .pick { grid-area: check; align-self: center; }
   .sign-row > .plate-slot { grid-area: plate; }
   .sign-row > .row-note { grid-area: note; }
   .sign-row > .sign-input { grid-area: input; }
   .sign-row > .row-actions { grid-area: actions; min-width: 0; }
   .row-note:empty { display: none; }
   .add-row { padding-block: .7rem; }
-  .group-head { padding-inline: .9rem; }
+  .group-head { padding-inline: calc(.9rem + 4px) .9rem; }
   .banner { padding-inline: .9rem; }
   .export-controls { padding: .6rem .8rem; gap: .5rem; }
   .export-controls .segmented { flex: 1 1 auto; }
@@ -433,7 +445,7 @@ dialog h2 { font: 600 1.8rem/1.2 var(--display); margin-bottom: .8rem; }
   .panel-body { padding: 0 1rem calc(1.25rem + env(safe-area-inset-bottom)); }
   .editor.panel-open .export-bar, .kb-open .export-bar { display: none; }
   .kb-open .add-row .plate-slot { display: none; } /* every pixel above the keyboard goes to the row being edited */
-  .tray { scroll-padding-block: 2.6rem 1rem; } /* keeps a focused row clear of the sticky group title */
+  .tray { scroll-padding-block: 3.2rem 1rem; } /* keeps a focused row clear of the sticky group title */
   .editor.panel-open:has(.tray .sign-row) .add-row { display: none; }
   .editor.panel-open .banner:not(.danger) { display: none; }
 

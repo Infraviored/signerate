@@ -12,7 +12,7 @@ import shutil
 import sys
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import fonts
@@ -76,6 +76,17 @@ def log(msg):
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _touch(data):
+    """Stamps `updated_at` with microseconds, always later than the stored value, so two
+    saves within one second still differ (the stale-tab check compares this string)."""
+    new = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+    old = data.get("updated_at")
+    if isinstance(old, str) and old >= new:
+        stepped = datetime.fromisoformat(old) + timedelta(microseconds=1)
+        new = stepped.isoformat(timespec="microseconds")
+    data["updated_at"] = new
 
 
 def new_id():
@@ -515,13 +526,18 @@ def create_set(payload):
 
 
 def update_set(name, payload):
+    """Replaces settings and/or the sign list. `base_updated_at` is the `updated_at` the client
+    last saw; if it is present and differs, another tab changed the Set and nothing is written."""
     with LOCK:
         data = read_set(name)
+        base = payload.get("base_updated_at")
+        if base is not None and base != data["updated_at"]:
+            raise ApiError("This Set was changed elsewhere. Reload to see the latest version.", 409)
         if "settings" in payload:
             data["settings"] = validate_settings(payload["settings"], data["settings"])
         if "signs" in payload:
             data["signs"] = _merge_signs(data["signs"], payload["signs"])
-        data["updated_at"] = now_iso()
+        _touch(data)
         _write(_path(name), data)
         return data
 
@@ -535,7 +551,7 @@ def rename_set(name, new_name):
         if _name_taken(new_name, except_name=name):
             raise ApiError("A Set with this name already exists.", 409)
         data["name"] = new_name
-        data["updated_at"] = now_iso()
+        _touch(data)
         _write(_path(new_name), data)
         _path(name).unlink()
         return data
@@ -561,7 +577,7 @@ def renew_sign(name, sign_id):
                 break
         else:
             raise ApiError("Sign not found.", 404)
-        data["updated_at"] = now_iso()
+        _touch(data)
         _write(_path(name), data)
         return data
 
@@ -574,7 +590,7 @@ def renew_all(name):
             s["exported_at"] = None
         data["font_size"] = None
         data["exported_settings"] = None
-        data["updated_at"] = now_iso()
+        _touch(data)
         _write(_path(name), data)
         return data
 
@@ -628,10 +644,15 @@ def export_filename(name, first_text, count, settings, fmt):
     return f"{name.replace(' ', '_')}-{word or 'Sign'}{more}-{size}.{fmt}"
 
 
-def run_export(name, scope, fmt, output_path, generate, progress=None, deliver=None):
+def run_export(name, scope, fmt, output_path, generate, progress=None, deliver=None, ids=None):
     """Exports signs of a Set. `generate(texts, font_sizes, settings, path, fmt, progress)`
-    builds the file. Only after it succeeded are the signs marked as exported."""
-    if scope not in ("new", "all"):
+    builds the file. Only after it succeeded are the signs marked as exported.
+    With `ids`, exactly those signs are exported (in list order) and `scope` is ignored."""
+    if ids is not None:
+        if not isinstance(ids, list) or not ids or not all(isinstance(i, str) for i in ids):
+            raise ApiError("ids must be a non-empty list of sign ids.")
+        scope = "selected"
+    elif scope not in ("new", "all"):
         raise ApiError("scope must be 'new' or 'all'.")
     if fmt not in ("3mf", "step"):
         raise ApiError("format must be '3mf' or 'step'.")
@@ -643,7 +664,13 @@ def run_export(name, scope, fmt, output_path, generate, progress=None, deliver=N
     signs = snap["signs"]
     if not signs:
         raise ApiError("This Set has no signs yet.")
-    selected = [(i, s) for i, s in enumerate(signs) if scope == "all" or not s.get("exported_at")]
+    if ids is not None:
+        wanted = set(ids)
+        selected = [(i, s) for i, s in enumerate(signs) if s["id"] in wanted]
+        if len(selected) != len(wanted):
+            raise ApiError("Some of the selected signs no longer exist. Reload the page.")
+    else:
+        selected = [(i, s) for i, s in enumerate(signs) if scope == "all" or not s.get("exported_at")]
     if not selected:
         raise ApiError("Nothing new to export. Choose 'All' or mark signs as new.")
     font_path = settings["font_path"]
@@ -675,7 +702,7 @@ def run_export(name, scope, fmt, output_path, generate, progress=None, deliver=N
             cur["font_size"] = plan["set_size"]
         cur["exported_settings"] = dict(settings)
         cur["exports"].append({"at": now, "format": fmt, "scope": scope, "count": len(selected)})
-        cur["updated_at"] = now
+        _touch(cur)
         _write(_path(name), cur)
 
     return {

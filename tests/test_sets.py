@@ -334,3 +334,74 @@ def test_export_filename():
     assert sets_store.export_filename("Klingel", "Florian\nSchneider", 1, st, "3mf") == "Klingel-Florian-43x19.5mm.3mf"
     assert sets_store.export_filename("My Set", "Bits, Bohrer", 3, st, "step") == "My_Set-Bits+2-43x19.5mm.step"
     assert sets_store.export_filename("S", "...", 1, st, "3mf") == "S-Sign-43x19.5mm.3mf"
+
+
+# --- export by selection ids -------------------------------------------------
+
+def test_export_with_ids_marks_only_those(store, tmp_path):
+    data = make_set("T", texts=["d", "c", "b", "a"], exported={"c"})
+    ids = {s["text"]: s["id"] for s in data["signs"]}
+    gen = FakeGenerator()
+    res = sets_store.run_export("T", "new", "3mf", tmp_path / "out.bin", gen, ids=[ids["a"], ids["c"]])
+    assert res["count"] == 2
+    assert gen.calls[0]["texts"] == ["c", "a"]  # list order, not request order
+    after = {s["text"]: s for s in sets_store.read_set("T")["signs"]}
+    assert after["a"]["exported_at"] and after["c"]["exported_at"]
+    assert after["d"]["exported_at"] is None and after["b"]["exported_at"] is None
+    assert sets_store.read_set("T")["exports"][-1]["scope"] == "selected"
+
+
+def test_export_with_unknown_or_empty_ids_is_rejected(store, tmp_path):
+    data = make_set("T", texts=["b", "a"])
+    good = data["signs"][0]["id"]
+    for bad in ([], ["nope"], [good, "nope"], "x", [1]):
+        with pytest.raises(ApiError) as e:
+            sets_store.run_export("T", "new", "3mf", tmp_path / "out.bin", FakeGenerator(), ids=bad)
+        assert e.value.status == 400
+    assert all(s["exported_at"] is None for s in sets_store.read_set("T")["signs"])
+
+
+# --- stale-tab protection ----------------------------------------------------
+
+def _payload(data, base=..., texts=None):
+    body = {"signs": [{"id": s["id"], "text": s["text"]} for s in data["signs"]]}
+    if texts is not None:
+        body["signs"] = texts
+    if base is not ...:
+        body["base_updated_at"] = base
+    return body
+
+
+def test_put_with_stale_base_is_409_and_writes_nothing(store):
+    data = make_set("T", texts=["b", "a"])
+    stale = data["updated_at"]
+    sets_store.update_set("T", _payload(data, base=stale, texts=[{"text": "c"}] + _payload(data)["signs"]))
+    with pytest.raises(ApiError) as e:
+        sets_store.update_set("T", _payload(data, base=stale, texts=[]))  # would delete everything
+    assert e.value.status == 409
+    assert [s["text"] for s in sets_store.read_set("T")["signs"]] == ["c", "b", "a"]
+
+
+def test_put_with_matching_or_missing_base_is_ok(store):
+    data = make_set("T", texts=["a"])
+    out = sets_store.update_set("T", _payload(data, base=data["updated_at"]))
+    assert out["updated_at"] != data["updated_at"]
+    sets_store.update_set("T", _payload(data))  # no base: allowed
+
+
+def test_two_quick_puts_with_refreshed_base_are_ok(store):
+    data = make_set("T", texts=["a"])
+    first = sets_store.update_set("T", _payload(data, base=data["updated_at"]))
+    second = sets_store.update_set("T", _payload(first, base=first["updated_at"]))
+    third = sets_store.update_set("T", _payload(second, base=second["updated_at"]))
+    assert len({data["updated_at"], first["updated_at"], second["updated_at"], third["updated_at"]}) == 4
+
+
+def test_every_write_changes_updated_at(store, tmp_path):
+    data = make_set("T", texts=["a"], exported={"a"})
+    seen = [data["updated_at"]]
+    seen.append(sets_store.renew_sign("T", data["signs"][0]["id"])["updated_at"])
+    seen.append(sets_store.renew_all("T")["updated_at"])
+    seen.append(sets_store.run_export("T", "all", "3mf", tmp_path / "o.bin", FakeGenerator())["set"]["updated_at"])
+    seen.append(sets_store.rename_set("T", "U")["updated_at"])
+    assert len(set(seen)) == len(seen)
