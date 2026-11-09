@@ -3,7 +3,7 @@
 {% block body %}
 <div class="editor" id="editor" data-set-name="{{ name }}">
   <header class="topbar">
-    <a class="back-link" href="/" aria-label="All sets"><img class="logo" src="{{ url_for('static', filename='logo.svg') }}" alt=""><span class="back-text">All sets</span></a>
+    <a class="back-link" href="/" aria-label="All sets"><svg class="back-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><img class="logo" src="{{ url_for('static', filename='logo.svg') }}" alt=""><span class="back-text">All sets</span></a>
     <div class="set-name-wrap">
       <input type="text" class="set-name-input" id="set-name" maxlength="60" autocomplete="off" aria-label="Set name">
       <div class="name-error" id="name-error" hidden></div>
@@ -17,7 +17,7 @@
     <div class="workspace" id="workspace">
       <div class="banner danger" id="thickness-banner" hidden></div>
       <div class="banner" id="changed-banner" hidden>
-        <span>Size or style changed since the last export.</span>
+        <span>Size or style changed since the last export</span>
         <button class="btn" type="button" id="changed-renew">Mark all as new</button>
       </div>
 

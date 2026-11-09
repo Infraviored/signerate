@@ -244,8 +244,8 @@
   function applyPreview() {
     const st = set.settings;
     const room = $('workspace').clientWidth;
-    const narrow = room < STACK_BELOW; // rows stack: sign above its text, full width
-    scale = S.plateScale(st, narrow ? room - 32 : 300, narrow ? 170 : 100);
+    const narrow = room < STACK_BELOW; // rows stack: sign above its text, beside the checkbox column
+    scale = S.plateScale(st, narrow ? room - 72 : 300, narrow ? 40 : 100);
     $('workspace').style.setProperty('--plate-w', `${st.width * scale}px`);
 
     const p = state.preview;
@@ -290,20 +290,20 @@
     if (state.previewError) {
       kids.push(S.el('div', { class: 'limit', text: 'No preview: ' + state.previewError }));
     } else if (!p || p.font_size === null) {
-      kids.push(S.el('div', { text: 'Add a sign to see the text size.' }));
+      kids.push(S.el('div', { text: 'Add a sign to see the text size' }));
     } else {
       kids.push(S.el('div', { class: 'stat-size', text: `${p.font_size.toFixed(2)} mm` }));
       if (st.text_size) {
-        kids.push(S.el('div', { text: 'Fixed by you.' }));
+        kids.push(S.el('div', { text: 'Fixed by you' }));
       } else if (set.font_size !== null) {
-        kids.push(S.el('div', { text: 'Locked at the first export, so new signs match the ones already printed.' }));
+        kids.push(S.el('div', { text: 'Locked at the first export, so new signs match the ones already printed' }));
       } else if (p.limiting_text) {
-        kids.push(S.el('div', { text: `Set by the longest sign, "${p.limiting_text}".` }));
+        kids.push(S.el('div', { text: `Set by the longest sign, "${p.limiting_text}"` }));
       } else {
-        kids.push(S.el('div', { text: 'Set by the plate height.' }));
+        kids.push(S.el('div', { text: 'Set by the plate height' }));
       }
       const shrunk = p.signs.filter((s) => s.shrunk).length;
-      if (shrunk) kids.push(S.el('div', { class: 'limit', text: `${plural(shrunk)} shrunk to fit.` }));
+      if (shrunk) kids.push(S.el('div', { class: 'limit', text: `${plural(shrunk)} shrunk to fit` }));
     }
     const warn = S.thicknessWarning(st);
     if (warn) kids.push(S.el('div', { class: 'limit', text: warn.text }));
@@ -706,7 +706,7 @@
     const bar = $('progress-bar');
     setBusy(true);
     $('progress').hidden = false;
-    bar.style.width = '0%';
+    bar.style.transform = 'scaleX(0)';
     showStatus('info', 'Saving');
     let poll = null;
     try {
@@ -716,20 +716,20 @@
         try {
           const p = await S.api('GET', '/api/progress');
           if (p.active && p.total > 0) {
-            bar.style.width = `${(p.current / p.total) * 100}%`;
+            bar.style.transform = `scaleX(${p.current / p.total})`;
             showStatus('info', `Sign ${p.current} of ${p.total}`);
           }
         } catch (e) { /* the export request reports real errors */ }
       }, 500);
       const res = await S.api('POST', `${S.setUrl(state.name)}/export`, { ids, format: state.format, destination: state.destination });
-      bar.style.width = '100%';
+      bar.style.transform = 'scaleX(1)';
       mergeServerMeta(res.set);
       for (const id of ids) state.selected.delete(id);
       state.lastExport = { token: res.token, filename: res.filename, set: state.name, count: res.count };
       if (state.destination === 'nextcloud') {
-        showStatus('success', `Saved ${plural(res.count)} to Nextcloud.`, state.lastExport);
+        showStatus('success', `Saved ${plural(res.count)} to Nextcloud`, state.lastExport);
       } else {
-        showStatus('success', `Exported ${plural(res.count)}.`, state.lastExport);
+        showStatus('success', `Exported ${plural(res.count)}`, state.lastExport);
         startDownload(res.token);
       }
       renderList();
@@ -775,7 +775,7 @@
     const last = await S.api('GET', '/api/last-export');
     if (last && last.set === state.name) {
       state.lastExport = last;
-      showStatus('info', last.count ? `Last export: ${plural(last.count)}.` : 'Last export ready.', last);
+      showStatus('info', last.count ? `Last export: ${plural(last.count)}` : 'Last export ready', last);
     }
   } catch (e) { /* optional */ }
 })();

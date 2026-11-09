@@ -91,7 +91,7 @@
   function askDelete(set) {
     pendingDelete = set.name;
     $('delete-text').textContent =
-      `"${set.name}" and its ${set.sign_count} signs will be moved to the trash folder on the server.`;
+      `"${set.name}" and its ${set.sign_count} signs will be moved to the trash folder on the server`;
     deleteDialog.showModal();
   }
 
@@ -100,7 +100,7 @@
     deleteDialog.close();
     try {
       await S.api('DELETE', S.setUrl(name));
-      S.toast(`Moved "${name}" to the trash.`);
+      S.toast(`Moved "${name}" to the trash`);
     } catch (e) {
       S.toast('Delete failed: ' + e.message, { type: 'error' });
     }
@@ -192,15 +192,15 @@
 
   async function create() {
     const name = nameInput.value.trim();
-    if (!name) { nameError.textContent = 'Please enter a name.'; nameInput.focus(); return; }
+    if (!name) { nameError.textContent = 'Enter a name'; nameInput.focus(); return; }
     if (sets.some((s) => s.name.toLowerCase() === name.toLowerCase())) {
-      nameError.textContent = 'A set with this name already exists.';
+      nameError.textContent = 'A set with this name already exists';
       nameInput.focus();
       return;
     }
     const st = form.get();
     if (Object.keys(S.checkSettings(st)).length) {
-      S.toast('Fix the highlighted fields first.', { type: 'error' });
+      S.toast('Fix the highlighted fields first', { type: 'error' });
       return;
     }
     const btn = $('wizard-create');

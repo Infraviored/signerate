@@ -92,7 +92,7 @@
     try {
       res = await fetch(url, init);
     } catch (e) {
-      throw new Error('Cannot reach the server.');
+      throw new Error('Cannot reach the server');
     }
     let data = null;
     try { data = await res.json(); } catch (e) { /* no body */ }
@@ -218,20 +218,20 @@
     const err = {};
     const fin = (v) => typeof v === 'number' && Number.isFinite(v);
     for (const k of ['width', 'height', 'base_thickness', 'text_thickness']) {
-      if (!fin(s[k]) || s[k] <= 0) err[k] = 'Must be greater than 0.';
+      if (!fin(s[k]) || s[k] <= 0) err[k] = 'Must be greater than 0';
     }
-    if (!fin(s.min_margin) || s.min_margin < 0) err.min_margin = 'Must be 0 or more.';
-    if (!fin(s.frame_width) || s.frame_width < 0) err.frame_width = 'Must be 0 or more.';
-    if (!fin(s.text_protrusion)) err.text_protrusion = 'Must be a number.';
+    if (!fin(s.min_margin) || s.min_margin < 0) err.min_margin = 'Must be 0 or more';
+    if (!fin(s.frame_width) || s.frame_width < 0) err.frame_width = 'Must be 0 or more';
+    if (!fin(s.text_protrusion)) err.text_protrusion = 'Must be a number';
     if (!err.min_margin && !err.frame_width && !err.width && !err.height
         && 2 * (s.min_margin + s.frame_width) >= Math.min(s.width, s.height)) {
-      err.min_margin = 'Margin and frame are too large for this plate.';
+      err.min_margin = 'Margin and frame are too large for this plate';
     }
-    if (!s.font_path) err.font_path = 'Choose a font.';
-    if (s.text_size !== null && (!fin(s.text_size) || s.text_size <= 0)) err.text_size = 'Text size must be greater than 0.';
+    if (!s.font_path) err.font_path = 'Choose a font';
+    if (s.text_size !== null && (!fin(s.text_size) || s.text_size <= 0)) err.text_size = 'Text size must be greater than 0';
     // Ranges depend on the plate and the shape, so the server has the last word (shown in the same error line).
     for (const [key, v] of Object.entries(s.shape_params || {})) {
-      if (!fin(v) || v < 0) err['shape_' + key] = 'Shape values must be 0 or more.';
+      if (!fin(v) || v < 0) err['shape_' + key] = 'Shape values must be 0 or more';
     }
     return err;
   };
@@ -239,7 +239,7 @@
   S.thicknessWarning = function (s) {
     const minZ = s.base_thickness + s.text_protrusion - s.text_thickness;
     if (minZ < -0.01) return { level: 'danger', text: `The text goes through the back of the plate. Reduce the text depth by ${Math.abs(minZ).toFixed(2)} mm.` };
-    if (minZ < 0.4) return { level: 'warn', text: `Thin back wall: ${minZ.toFixed(2)} mm behind the text.` };
+    if (minZ < 0.4) return { level: 'warn', text: `Thin back wall: ${minZ.toFixed(2)} mm behind the text` };
     return null;
   };
 
@@ -247,9 +247,9 @@
     ['width', 'Width (mm)', '', { min: 1, step: 0.5 }],
     ['height', 'Height (mm)', '', { min: 1, step: 0.5 }],
     ['base_thickness', 'Thickness (mm)', '', { min: 0.1, step: 0.2 }],
-    ['min_margin', 'Margin (mm)', 'Kept free around the text.', { min: 0, step: 0.5 }],
+    ['min_margin', 'Margin (mm)', 'Kept free around the text', { min: 0, step: 0.5 }],
     ['frame_width', 'Frame (mm)', '0 is no frame. Uses the text colour.', { min: 0, step: 0.5 }],
-    ['text_thickness', 'Text depth (mm)', 'How deep the letters go.', { min: 0.1, step: 0.2 }],
+    ['text_thickness', 'Text depth (mm)', 'How deep the letters go', { min: 0.1, step: 0.2 }],
     ['text_protrusion', 'Raised by (mm)', '0 is flush with the plate.', { step: 0.1 }],
   ];
 
@@ -263,7 +263,7 @@
     const shapeInputs = {};
 
     const FIT_HINT = 'Fills the width or height. The longest sign sets the size for all.';
-    const FIXED_HINT = 'A sign too long for this size shrinks to fit.';
+    const FIXED_HINT = 'A sign too long for this size shrinks to fit';
     const sizeFit = S.el('button', { type: 'button', text: 'Fit plate', on: { click: () => setFixed(false) } });
     const sizeFixed = S.el('button', { type: 'button', text: 'Fixed', on: { click: () => setFixed(true) } });
     const sizeInput = S.el('input', { type: 'number', id: 'f-text_size', attrs: { min: 0.5, step: 0.5, 'aria-label': 'Fixed text size in mm' } });
@@ -328,7 +328,7 @@
       shapePicker.append(btn);
     }
     const shapeFields = S.el('div', { class: 'shape-fields' });
-    const shapeHint = S.el('div', { class: 'field-hint', text: 'Leave a field empty for the automatic value.' });
+    const shapeHint = S.el('div', { class: 'field-hint', text: 'Leave a field empty for the automatic value' });
     const shapeInfo = (id) => S.shapes.find((sh) => sh.id === id) || { params: [] };
     const autoText = (key) => {
       const p = outline && outline.shape === current.shape && outline.params[key];

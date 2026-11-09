@@ -1,5 +1,8 @@
 /* Signerate: a workshop bench. Enamel-grey machine paint, an anthracite control
-   strip, signal yellow for "this goes to the printer". The signs carry the colour. */
+   strip, signal yellow for "this goes to the printer". The signs carry the colour.
+
+   Spacing moves in .25rem steps. Type uses seven sizes: .875, 1, 1.125, 1.25,
+   1.5, 1.75 and 2rem. */
 :root {
   --enamel: #d6d8d2;
   --bed: #e9eae5;
@@ -14,6 +17,8 @@
   --red: #a8231b;
   --ui: 'Barlow', system-ui, sans-serif;
   --display: 'Barlow Condensed', 'Barlow', system-ui, sans-serif;
+  --tap: 44px;
+  --pick-col: 1.5rem; /* the checkbox column; the add row and day headings line up with it */
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -26,7 +31,7 @@ body {
   padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
   background: var(--enamel);
   color: var(--ink);
-  font: 400 16px/1.45 var(--ui);
+  font: 400 1rem/1.45 var(--ui);
 }
 
 h1, h2, h3, p { margin: 0; }
@@ -46,7 +51,7 @@ a { color: inherit; }
   background: transparent;
   color: var(--ink);
   border-radius: 3px;
-  padding: .4rem .9rem;
+  padding: .5rem 1rem;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -79,12 +84,12 @@ a { color: inherit; }
   background: transparent; color: var(--muted);
   cursor: pointer;
 }
-.icon-btn svg { width: 1.1rem; height: 1.1rem; }
+.icon-btn svg { width: 1.125rem; height: 1.125rem; }
 
 .segmented { display: inline-flex; border: 1px solid var(--on-dark-muted); border-radius: 3px; overflow: hidden; }
 .segmented button {
   border: 0; background: transparent; color: var(--on-dark);
-  padding: .4rem .85rem; cursor: pointer; white-space: nowrap;
+  padding: .5rem .75rem; cursor: pointer; white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .segmented button.active { background: var(--on-dark); color: var(--anthracite); font-weight: 600; }
@@ -103,13 +108,13 @@ a { color: inherit; }
 }
 .logo { display: block; width: 3.25rem; height: 3.25rem; flex: none; }
 .wordmark {
-  display: flex; align-items: center; gap: .6rem;
-  font: 600 1.9rem/1 var(--display);
+  display: flex; align-items: center; gap: .5rem;
+  font: 600 2rem/1 var(--display);
   margin-right: auto;
 }
-.back-link { display: flex; align-items: center; gap: .6rem; color: var(--on-dark-muted); text-decoration: none; white-space: nowrap; }
-.back-link::after { content: none; }
+.back-link { display: flex; align-items: center; gap: .5rem; color: var(--on-dark-muted); text-decoration: none; white-space: nowrap; }
 .back-link:hover { color: var(--on-dark); }
+.back-chevron { display: none; width: 1.125rem; height: 1.125rem; flex: none; }
 
 .set-name-wrap { position: relative; min-width: 0; }
 .set-name-input {
@@ -117,42 +122,48 @@ a { color: inherit; }
   min-width: 6ch; max-width: 40vw;
   background: transparent; border: 0; border-bottom: 1px solid transparent;
   color: var(--on-dark);
-  font: 600 1.9rem/1.1 var(--display);
-  padding: 0 .1rem;
+  font: 600 2rem/1.1 var(--display);
+  padding: 0;
 }
 .set-name-input:hover { border-bottom-color: var(--on-dark-muted); }
 .name-error {
   position: absolute; top: 100%; left: 0; z-index: 10;
   background: var(--red); color: #fff;
-  padding: .25rem .6rem; border-radius: 3px; white-space: nowrap; font-size: .9rem; max-width: calc(100vw - 2rem);
+  padding: .25rem .5rem; border-radius: 3px; white-space: nowrap; font-size: .875rem; max-width: calc(100vw - 2rem);
 }
 .summary { color: var(--on-dark-muted); white-space: nowrap; overflow: hidden; text-overflow: clip; min-width: 0; flex: 1; }
-.save-state { color: var(--on-dark-muted); font-size: .9rem; min-width: 3.4rem; text-align: right; }
+.save-state { color: var(--on-dark-muted); font-size: .875rem; min-width: 3.5rem; text-align: right; }
 .save-state.error { color: #ffb4ad; cursor: pointer; }
 
 /* --- Overview: a wall of shelves ---------------------------------------- */
 .shelves { padding: 1.5rem clamp(1rem, 4vw, 3rem) 4rem; }
 .shelf { position: relative; padding-top: 1.75rem; }
+/* The ledge's shadow falls only below it, never up the sides of the strip. */
+.shelf::after {
+  content: ''; position: absolute; inset: auto 0 -.5rem; height: .5rem;
+  background: linear-gradient(rgb(27 32 35 / .22), rgb(27 32 35 / 0));
+  pointer-events: none;
+}
 .shelf-head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
-.shelf-head h2 { font: 600 2.1rem/1.1 var(--display); min-width: 0; overflow-wrap: anywhere; }
+.shelf-head h2 { font: 600 2rem/1.1 var(--display); min-width: 0; overflow-wrap: anywhere; }
 .shelf-name { text-decoration: none; }
 .shelf-name::after { content: ''; position: absolute; inset: 0; }
 .shelf-facts { color: var(--muted); }
 .tag-new {
   background: var(--signal); color: var(--ink);
-  padding: 0 .5rem; border-radius: 2px; font-weight: 600; font-size: .9rem;
+  padding: 0 .5rem; border-radius: 2px; font-weight: 600; font-size: .875rem;
 }
-.shelf-actions { position: relative; z-index: 1; margin-left: auto; display: flex; align-items: center; gap: .35rem; align-self: center; }
+.shelf-actions { position: relative; z-index: 1; margin-left: auto; display: flex; align-items: center; gap: .25rem; align-self: center; }
+.shelf-actions .btn:not(:hover) { border-color: var(--line); }
 .shelf-signs {
   display: flex; align-items: flex-end; gap: .75rem;
   overflow: auto hidden;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
-  scroll-padding-left: 6px;
+  scroll-padding-left: .5rem;
   scrollbar-width: thin;
-  padding: 6px 6px 10px;
+  padding: .5rem .5rem .75rem;
   border-bottom: 7px solid var(--anthracite);
-  box-shadow: 0 9px 10px -6px rgb(27 32 35 / .4);
 }
 .shelf-signs > * { flex: none; scroll-snap-align: start; }
 
@@ -169,7 +180,7 @@ a { color: inherit; }
 .banner {
   flex: none; flex-wrap: wrap;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: .45rem 1.5rem;
+  padding: .5rem 1.5rem;
   background: var(--signal);
 }
 .banner.danger { background: var(--red); color: #fff; }
@@ -180,33 +191,38 @@ a { color: inherit; }
   grid-template-columns: auto var(--plate-w) minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 1.25rem;
-  padding: .4rem 1rem .4rem 1.25rem;
+  padding: .5rem 1rem .5rem 1.25rem;
   border-left: 4px solid transparent;
 }
-.sign-row.add-row { grid-template-columns: var(--plate-w) minmax(0, 1fr); }
+.sign-row.add-row { grid-template-columns: var(--pick-col) var(--plate-w) minmax(0, 1fr); }
+.add-row > .plate-slot { grid-column: 2; }
+.add-row > .sign-input { grid-column: 3; }
 .plate-slot { line-height: 0; }
 .tray .plate-slot { cursor: pointer; }
+/* Typing moves the text straight into a new row, so this plate stays blank: a
+   ghost beside a list of signs, full strength only while it is the sole preview. */
+.workspace:has(.tray .sign-row) .add-row .sign-svg { opacity: .2; filter: none; }
 
 /* Selection checkbox: the label around it is the touch target. */
 .pick { display: grid; place-items: center; width: 2rem; height: 2rem; margin: -.25rem; cursor: pointer; }
-.pick input { width: 1.2rem; height: 1.2rem; margin: 0; accent-color: var(--anthracite); cursor: pointer; }
+.pick input { width: 1.25rem; height: 1.25rem; margin: 0; accent-color: var(--anthracite); cursor: pointer; }
 .sign-row.selected { background: rgb(27 32 35 / .06); }
 
 .sign-input {
   width: 100%;
   border: 0; border-bottom: 1px solid transparent;
   background: transparent;
-  padding: .3rem .2rem;
-  font-size: 1.15rem; font-weight: 500;
+  padding: .25rem 0;
+  font-size: 1.125rem; font-weight: 500;
   display: block; resize: none; overflow: hidden; field-sizing: content;
 }
 .sign-input:hover { border-bottom-color: var(--line); }
-.sign-input:focus { outline: 0; border-bottom: 2px solid var(--ink); padding-bottom: calc(.3rem - 1px); }
+.sign-input:focus { outline: 0; border-bottom-color: var(--ink); box-shadow: inset 0 -1px 0 var(--ink); }
 .sign-input::placeholder { color: var(--muted); font-weight: 400; }
 .editing-empty .sign-input { border-bottom-color: var(--red); }
 
-.add-row { flex: none; padding-block: .9rem; }
-.add-row .sign-input { font-size: 1.3rem; border-bottom-color: var(--ink); }
+.add-row { flex: none; padding-block: .75rem; }
+.add-row .sign-input { font-size: 1.25rem; border-bottom-color: var(--ink); }
 
 .tray {
   flex: 1; min-height: 0;
@@ -222,15 +238,15 @@ a { color: inherit; }
 
 .group-head {
   position: sticky; top: 0; z-index: 2;
-  display: flex; gap: .5rem; align-items: center;
+  display: flex; gap: 1.25rem; align-items: center;
   background: var(--bed);
-  padding: .4rem 1rem .2rem calc(1.25rem + 4px);
-  font: 600 1.2rem/1.2 var(--display);
+  padding: .5rem 1rem .25rem calc(1.25rem + 4px);
+  font: 600 1.25rem/1.2 var(--display);
 }
-.group-count { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.group-count { margin-left: -.75rem; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
 
-.row-note { color: var(--red); font-size: .9rem; white-space: nowrap; }
-.row-actions { display: flex; gap: .15rem; min-width: 6.3rem; justify-content: flex-end; }
+.row-note { color: var(--red); font-size: .875rem; white-space: nowrap; }
+.row-actions { display: flex; gap: .25rem; min-width: 6.5rem; justify-content: flex-end; }
 .row-confirm { visibility: hidden; color: var(--ink); background: var(--signal); }
 .sign-row:focus-within .row-confirm { visibility: visible; }
 @media (hover: hover) {
@@ -242,13 +258,13 @@ a { color: inherit; }
 
 /* --- Export strip ------------------------------------------------------- */
 .export-bar { flex: none; position: relative; background: var(--anthracite); color: var(--on-dark); padding-bottom: env(safe-area-inset-bottom); }
-.export-controls { display: flex; align-items: center; gap: .9rem; padding: .75rem 1.5rem; flex-wrap: wrap; }
-.btn-export { margin-left: auto; min-width: 12.5rem; padding-block: .55rem; font-size: 1.05rem; }
+.export-controls { display: flex; align-items: center; gap: 1rem; padding: .75rem 1.5rem; flex-wrap: wrap; }
+.btn-export { margin-left: auto; min-width: 12.5rem; padding-block: .5rem; font-size: 1.125rem; }
 .export-status { color: var(--on-dark-muted); display: flex; gap: .75rem; white-space: nowrap; }
 .export-status.error { color: #ffb4ad; white-space: normal; }
 .export-status a { color: var(--on-dark); }
 .progress { position: absolute; inset: 0 0 auto; height: 3px; background: var(--anthracite-2); }
-.progress-bar { height: 100%; width: 0; background: var(--signal); transition: width .3s linear; }
+.progress-bar { height: 100%; background: var(--signal); transform: scaleX(0); transform-origin: left; transition: transform .3s linear; }
 
 /* --- Size & style column ------------------------------------------------ */
 .panel {
@@ -257,30 +273,30 @@ a { color: inherit; }
   background: var(--bed);
   border-left: 1px solid var(--line);
 }
-.panel-head { display: flex; justify-content: space-between; align-items: center; padding: .7rem 1.1rem .3rem; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; padding: .75rem 1rem .25rem; }
 .panel-head h2 { font: 600 1.5rem/1.2 var(--display); }
-.panel-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 1.1rem 1.25rem; }
+.panel-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 1rem 1.25rem; }
 
-.form-section { font: 600 1.15rem/1.2 var(--display); margin: 1.1rem 0 .55rem; }
-.field { margin-bottom: .7rem; min-width: 0; }
-.field > label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: .15rem; }
-.field-hint { font-size: .82rem; color: var(--muted); margin-top: .2rem; line-height: 1.3; }
+.form-section { font: 600 1.25rem/1.2 var(--display); margin: 1rem 0 .5rem; }
+.field { margin-bottom: .75rem; min-width: 0; }
+.field > label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: .25rem; }
+.field-hint { font-size: .875rem; color: var(--muted); margin-top: .25rem; line-height: 1.3; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .75rem; }
-.field-error { color: var(--red); font-size: .9rem; min-height: 1.2em; }
+.field-error { color: var(--red); font-size: .875rem; min-height: 1.2em; }
 
 .field input[type="text"], .field input[type="number"], .field select, .dropdown-trigger, .size-input input {
   width: 100%;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 3px;
-  padding: .35rem .5rem;
+  padding: .375rem .5rem;
 }
 .field input.invalid, .size-input input.invalid { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
-.field input[type="color"] { width: 100%; height: 2.2rem; padding: 2px; background: #fff; border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
-.size-row { display: flex; gap: .6rem; align-items: stretch; }
+.field input[type="color"] { width: 100%; height: 2.25rem; padding: 2px; background: #fff; border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
+.size-row { display: flex; gap: .5rem; align-items: stretch; }
 .size-input { flex: 1; min-width: 0; }
-.stats { display: grid; gap: .35rem; font-size: .95rem; }
-.stat-size { font: 600 1.7rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.stats { display: grid; gap: .25rem; font-size: .875rem; }
+.stat-size { font: 600 1.5rem/1 var(--display); font-variant-numeric: tabular-nums; }
 .limit { color: var(--red); }
 
 .custom-dropdown { position: relative; }
@@ -292,22 +308,22 @@ a { color: inherit; }
   box-shadow: 0 8px 18px rgb(27 32 35 / .25);
 }
 .dropdown-content.show { display: block; }
-.dropdown-search { padding: .4rem; }
-.dropdown-search input { width: 100%; border: 1px solid var(--line); border-radius: 3px; padding: .3rem .5rem; }
+.dropdown-search { padding: .5rem; }
+.dropdown-search input { width: 100%; border: 1px solid var(--line); border-radius: 3px; padding: .25rem .5rem; }
 .dropdown-list { max-height: 15rem; overflow-y: auto; }
-.dropdown-option { padding: .3rem .6rem; cursor: pointer; font-size: 1.05rem; }
+.dropdown-option { padding: .25rem .5rem; cursor: pointer; font-size: 1rem; }
 .dropdown-option.selected { background: var(--signal); }
 
 /* --- Shape picker ------------------------------------------------------- */
-.shape-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; margin-bottom: .7rem; }
+.shape-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-bottom: .75rem; }
 .shape-option {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem;
-  min-height: 44px; padding: .4rem .25rem .3rem;
+  min-height: 44px; padding: .5rem .25rem .25rem;
   background: #fff; color: var(--ink);
   border: 1px solid var(--line); border-radius: 3px;
-  font: inherit; font-size: .82rem; line-height: 1.15; text-align: center; cursor: pointer;
+  font: inherit; font-size: .875rem; line-height: 1.15; text-align: center; cursor: pointer;
 }
-.shape-option svg { width: 100%; height: auto; max-height: 2.6rem; fill: var(--anthracite-2); }
+.shape-option svg { width: 100%; height: auto; max-height: 2.5rem; fill: var(--anthracite-2); }
 .shape-option.active { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); background: var(--signal); }
 .shape-option.active svg { fill: var(--ink); }
 .shape-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .75rem; }
@@ -321,34 +337,34 @@ dialog {
   border: 0; border-top: 7px solid var(--anthracite);
   border-radius: 3px;
   background: var(--bed); color: var(--ink);
-  padding: 1.4rem 1.5rem;
+  padding: 1.5rem;
 }
 dialog::backdrop { background: rgb(27 32 35 / .55); }
-dialog h2 { font: 600 1.8rem/1.2 var(--display); margin-bottom: .8rem; }
-.dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; margin-top: 1.2rem; }
+dialog h2 { font: 600 1.75rem/1.2 var(--display); margin-bottom: .75rem; }
+.dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; margin-top: 1.25rem; }
 .push-left { margin-right: auto; }
 
-.wizard-options { display: grid; gap: .1rem; max-height: calc(var(--app-h, 100dvh) * .5); overflow-y: auto; }
+.wizard-options { display: grid; gap: .25rem; max-height: calc(var(--app-h, 100dvh) * .5); overflow-y: auto; }
 .wizard-option {
-  display: flex; align-items: center; gap: .8rem;
-  padding: .55rem .7rem;
+  display: flex; align-items: center; gap: .75rem;
+  padding: .5rem .75rem;
   border-left: 4px solid transparent;
   cursor: pointer;
 }
 .wizard-option:has(input:checked) { border-left-color: var(--signal); background: var(--enamel); }
 .wizard-option input { accent-color: var(--ink); }
 .option-text { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
-.option-text small { display: block; font-size: .9rem; font-weight: 400; color: var(--muted); }
-.check-row { display: flex; align-items: center; gap: .5rem; margin-top: .8rem; cursor: pointer; }
+.option-text small { display: block; font-size: .875rem; font-weight: 400; color: var(--muted); }
+.check-row { display: flex; align-items: center; gap: .5rem; margin-top: .75rem; cursor: pointer; }
 .check-row input { accent-color: var(--ink); }
 .wizard-preview { display: grid; place-items: center; min-height: 7.5rem; padding: .75rem; background: var(--enamel); margin-bottom: .5rem; }
 
 /* --- Toasts ------------------------------------------------------------- */
-.toasts { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 50; display: grid; gap: .4rem; }
+.toasts { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 50; display: grid; gap: .5rem; }
 .toast {
   display: flex; align-items: center; gap: 1rem;
   background: var(--ink); color: var(--on-dark);
-  padding: .5rem .9rem; border-radius: 3px;
+  padding: .5rem 1rem; border-radius: 3px;
   max-width: calc(100vw - 2rem);
 }
 .toast.error { background: var(--red); color: #fff; }
@@ -365,14 +381,12 @@ dialog h2 { font: 600 1.8rem/1.2 var(--display); margin-bottom: .8rem; }
    Rows and the export bar follow the width of the workspace (container query),
    so they also stack on a tablet with the Size & style column open. The window
    width decides about the top strip and the bottom sheet. */
-:root { --tap: 44px; }
-
 @media (max-width: 1100px) { .summary { display: none; } .topbar .set-name-wrap { flex: 1; } .set-name-input { max-width: 60vw; } }
 
 @media (pointer: coarse), (max-width: 720px) {
+  :root { --pick-col: var(--tap); }
   .btn, .segmented button { min-height: var(--tap); }
   .icon-btn { width: var(--tap); height: var(--tap); }
-  .icon-btn svg { width: 1.3rem; height: 1.3rem; }
   .field input[type="text"], .field input[type="number"], .field select, .dropdown-trigger,
   .size-input input, .dropdown-search input { min-height: var(--tap); }
   .dropdown-trigger { display: flex; align-items: center; }
@@ -383,54 +397,68 @@ dialog h2 { font: 600 1.8rem/1.2 var(--display); margin-bottom: .8rem; }
   .dropdown-option[hidden] { display: none; }
   .sign-input, .set-name-input { min-height: var(--tap); }
   .pick { width: var(--tap); height: var(--tap); margin: 0; }
-  .pick input { width: 1.4rem; height: 1.4rem; }
+  .pick input { width: 1.5rem; height: 1.5rem; }
   .group-head { min-height: var(--tap); }
   .shelf-name { display: inline-flex; align-items: center; min-height: var(--tap); }
   .wizard-option, .check-row { min-height: var(--tap); }
   .wizard-option input, .check-row input { width: 1.25rem; height: 1.25rem; }
   .export-status a { display: inline-flex; align-items: center; min-height: var(--tap); }
-  .toast button { min-height: var(--tap); padding: 0 .4rem; }
+  .toast button { min-height: var(--tap); padding: 0 .5rem; }
   .save-state.error { min-height: var(--tap); display: flex; align-items: center; }
 }
 
+/* Stacked rows: the checkbox holds the left column, the sign and its text share the
+   next one, so a phone shows as many signs as it can. */
 @container workspace (max-width: 760px) {
   .sign-row {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas: "plate plate plate" "note note note" "check input actions";
+    grid-template-columns: var(--pick-col) minmax(0, 1fr) auto;
+    grid-template-areas: "check plate plate" "check note note" "check input actions";
     align-items: start;
-    gap: .1rem .5rem;
-    padding: .6rem .6rem .6rem .9rem;
+    gap: 0 .5rem;
+    padding: .25rem .5rem;
   }
-  .sign-row.add-row { grid-template-columns: minmax(0, 1fr); grid-template-areas: "plate" "input"; }
   .sign-row > .pick { grid-area: check; align-self: center; }
   .sign-row > .plate-slot { grid-area: plate; }
   .sign-row > .row-note { grid-area: note; }
   .sign-row > .sign-input { grid-area: input; }
   .sign-row > .row-actions { grid-area: actions; min-width: 0; }
   .row-note:empty { display: none; }
-  .add-row { padding-block: .7rem; }
-  .group-head { padding-inline: calc(.9rem + 4px) .9rem; }
-  .banner { padding-inline: .9rem; }
-  .export-controls { padding: .6rem .8rem; gap: .5rem; }
+  .row-confirm { display: none; }
+  .sign-row:focus-within .row-confirm { display: grid; }
+  .sign-input, .add-row .sign-input { font-size: 1rem; padding-block: .5rem; }
+
+  .sign-row.add-row {
+    grid-template-columns: var(--pick-col) minmax(0, 1fr);
+    grid-template-areas: ". plate" ". input";
+  }
+  .add-row { padding-block: .25rem; }
+  /* With signs in the list they are the preview: the blank plate would only cost room. */
+  .workspace:has(.tray .sign-row) .add-row .plate-slot { display: none; }
+
+  .group-head { gap: .5rem; padding-block: 0; padding-inline: calc(.5rem + 4px) .5rem; }
+  .group-count { margin-left: 0; }
+  .banner { padding-inline: .75rem; }
+  .export-controls { padding: .5rem; gap: .5rem; }
   .export-controls .segmented { flex: 1 1 auto; }
-  .export-controls .segmented button { flex: 1; }
-  .export-status { order: 3; width: 100%; white-space: normal; flex-wrap: wrap; align-items: center; gap: .2rem .9rem; }
-  .btn-export { order: 4; width: 100%; margin: 0; min-height: 3rem; }
+  .export-controls .segmented button { flex: 1; padding-inline: .5rem; }
+  .export-status { order: -1; width: 100%; white-space: normal; flex-wrap: wrap; align-items: center; gap: .25rem 1rem; }
+  .btn-export { order: 4; flex: 1 0 auto; min-width: 0; margin: 0; min-height: var(--tap); padding-inline: .5rem; }
 }
 
 @media (max-width: 720px) {
-  .topbar { position: relative; flex-wrap: wrap; gap: .5rem .6rem; padding: max(.4rem, env(safe-area-inset-top)) .8rem .4rem; min-height: 3.5rem; }
-  .logo { width: 2.5rem; height: 2.5rem; }
-  .wordmark { font-size: 1.6rem; gap: .5rem; }
-  .back-link { gap: .5rem; min-height: var(--tap); }
+  :root { --tap: 40px; }
+  .topbar { position: relative; flex-wrap: wrap; gap: .25rem .5rem; padding: max(.25rem, env(safe-area-inset-top)) .5rem .25rem; min-height: 3rem; }
+  .logo { width: 2rem; height: 2rem; }
+  .wordmark { font-size: 1.5rem; gap: .5rem; }
+  .back-link { gap: .25rem; min-height: var(--tap); }
   .set-name-wrap { position: static; flex: 1; min-width: 0; }
   .set-name-input { font-size: 1.5rem; max-width: 100%; width: 100%; }
   #open-panel { margin-left: auto; }
   .name-wide .set-name-wrap { order: 5; flex: 1 0 100%; } /* a long name gets a line of its own */
   .name-wide .set-name-input { font-size: 1.25rem; }
-  .name-error { left: .8rem; right: .8rem; white-space: normal; }
+  .name-error { left: .75rem; right: .75rem; white-space: normal; }
   .save-state:not(.error) { display: none; }
-  .save-state.error { order: 5; flex-basis: 100%; text-align: left; font-size: .95rem; }
+  .save-state.error { order: 5; flex-basis: 100%; text-align: left; font-size: .875rem; }
 
   /* Size & style: a sheet along the bottom. The page above stays lit and keeps
      updating, so the signs act as the live preview. */
@@ -441,26 +469,26 @@ dialog h2 { font: 600 1.8rem/1.2 var(--display); margin-bottom: .8rem; }
     border-left: 0; border-top: 3px solid var(--anthracite);
     box-shadow: 0 -8px 14px -8px rgb(27 32 35 / .45);
   }
-  .panel-head { padding: .25rem .5rem .1rem 1rem; min-height: 3.25rem; }
+  .panel-head { padding: .25rem .5rem .25rem 1rem; min-height: 3.25rem; }
   .panel-body { padding: 0 1rem calc(1.25rem + env(safe-area-inset-bottom)); }
   .editor.panel-open .export-bar, .kb-open .export-bar { display: none; }
   .kb-open .add-row .plate-slot { display: none; } /* every pixel above the keyboard goes to the row being edited */
-  .tray { scroll-padding-block: 3.2rem 1rem; } /* keeps a focused row clear of the sticky group title */
+  .tray { scroll-padding-block: 3.25rem 1rem; } /* keeps a focused row clear of the sticky group title */
   .editor.panel-open:has(.tray .sign-row) .add-row { display: none; }
   .editor.panel-open .banner:not(.danger) { display: none; }
 
   .toasts { bottom: calc(var(--bar-h, 0px) + .75rem); width: calc(100vw - 1.5rem); }
   .toast { justify-content: space-between; max-width: none; }
 
-  .shelves { padding-inline: .8rem; }
+  .shelves { padding-inline: .75rem; }
   .shelf-head {
-    display: grid; gap: .1rem .7rem; align-items: baseline;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "name actions" "facts tag";
+    display: grid; gap: .25rem .75rem; align-items: baseline;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "name name actions" "facts tag actions";
   }
-  .shelf-head h2 { grid-area: name; font-size: 1.8rem; }
+  .shelf-head h2 { grid-area: name; font-size: 1.75rem; }
   .shelf-facts { grid-area: facts; }
-  .tag-new { grid-area: tag; justify-self: end; }
+  .tag-new { grid-area: tag; justify-self: start; }
   .shelf-actions { grid-area: actions; align-self: start; }
 
   dialog { width: calc(100vw - 1rem); max-height: calc(var(--app-h, 100dvh) - 1rem); margin: max(.5rem, env(safe-area-inset-top)) auto auto; padding: 1rem; }
@@ -471,6 +499,6 @@ dialog h2 { font: 600 1.8rem/1.2 var(--display); margin-bottom: .8rem; }
 
 @media (max-width: 540px) {
   .back-text { display: none; }
-  .back-link::before { content: '\2039'; font: 600 2.2rem/1 var(--display); margin-right: .1rem; }
+  .back-chevron { display: block; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
